@@ -10,10 +10,12 @@ app = FastAPI(
 )
 
 @app.get("/api/v1/insurance/premium_risk")
-def get_premium_risk(district: str, year: int, scenario: str = "RCP_8.5", db: Session = Depends(get_db)):
+def get_premium_risk(district: str, year: int, scenario: str = "SSP5_8.5", db: Session = Depends(get_db)):
     """
     Endpoint strictly for Insurance Companies to query risk tiers and adjust premiums.
     """
+    # Normalise legacy RCP names to SSP names for backward compatibility
+    scenario = scenario.replace("RCP_4.5", "SSP2_4.5").replace("RCP_8.5", "SSP5_8.5")
     prediction = db.query(RiskPredictions).filter(
         RiskPredictions.district == district,
         RiskPredictions.year == year,
@@ -33,10 +35,12 @@ def get_premium_risk(district: str, year: int, scenario: str = "RCP_8.5", db: Se
     }
 
 @app.get("/api/v1/dashboard/trajectory")
-def get_risk_trajectory(district: str, scenario: str = "RCP_8.5", db: Session = Depends(get_db)):
+def get_risk_trajectory(district: str, scenario: str = "SSP5_8.5", db: Session = Depends(get_db)):
     """
     Endpoint for the Streamlit dashboard to plot 15-year trajectories.
     """
+    # Normalise legacy RCP names
+    scenario = scenario.replace("RCP_4.5", "SSP2_4.5").replace("RCP_8.5", "SSP5_8.5")
     predictions = db.query(RiskPredictions).filter(
         RiskPredictions.district == district,
         RiskPredictions.scenario == scenario

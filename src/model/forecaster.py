@@ -25,12 +25,12 @@ def load_cmip6_mock_data(scenario: str):
         "Ujjain", "Umaria", "Vidisha"
     ]
     
-    data = []
+    data = [] 
     for d in districts:
         for y in years:
             # Simulate compound events building up over time in RCP 8.5 vs 4.5
             base_events = 5
-            multiplier = 1.5 if scenario == "RCP_8.5" else 1.1
+            multiplier = 1.5 if scenario == "SSP5_8.5" else 1.1
             future_events = int(base_events * multiplier * (y - 2025) / 5)
             
             data.append({
@@ -52,7 +52,7 @@ def generate_forecasts():
     model = joblib.load(model_path)
     print("🤖 Model loaded. Generating 15-year risk trajectories...")
     
-    for scenario in ["RCP_4.5", "RCP_8.5"]:
+    for scenario in ["SSP2_4.5", "SSP5_8.5"]:
         cmip6_df = load_cmip6_mock_data(scenario)
         
         for _, row in cmip6_df.iterrows():

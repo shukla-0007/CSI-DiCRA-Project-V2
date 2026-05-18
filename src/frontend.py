@@ -52,8 +52,8 @@ else:
     st.header(f"Actuarial Risk Trajectory (2026 - 2041): {district}")
     
     # RCP Scenario Toggle (Crucial for not averaging them)
-    scenario = st.radio("Select Climate Scenario:", ["RCP 4.5 (Moderate Action)", "RCP 8.5 (Business-As-Usual)"])
-    scenario_param = "RCP_4.5" if "4.5" in scenario else "RCP_8.5"
+    scenario = st.radio("Select Climate Scenario:", ["SSP2-4.5 (Middle of the Road)", "SSP5-8.5 (Fossil-Fuel Intensive)"])
+    scenario_param = "SSP2_4.5" if "SSP2" in scenario else "SSP5_8.5"
     
     try:
         response = requests.get(f"{API_URL}/dashboard/trajectory?district={district}&scenario={scenario_param}")
