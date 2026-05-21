@@ -118,6 +118,19 @@ def fetch_cmip6_district(
     start_str = f"{start_year}-01-01"
     end_str   = f"{end_year}-12-31"
 
+    # Local file cache check
+    district_slug = district.replace(" ", "_").replace("-", "_").lower()
+    cache_dir = os.path.join("data", "processed")
+    cache_path = os.path.join(cache_dir, f"cmip6_{district_slug}_{scenario}.csv")
+    if os.path.exists(cache_path):
+        try:
+            df = pd.read_csv(cache_path)
+            df["date"] = pd.to_datetime(df["date"])
+            print(f"    💾 [{district}] Loaded cached CMIP6 projections from {cache_path}")
+            return df
+        except Exception as e:
+            print(f"    ⚠️  Failed to read cache {cache_path}: {e}. Fetching from API...")
+
     def _db_log(status: str, service: str, message: str):
         db = SessionLocal()
         try:
@@ -176,6 +189,12 @@ def fetch_cmip6_district(
             df["soil_moisture"] = df["soil_moisture"].interpolate(method="linear").bfill().ffill()
 
             _db_log("SUCCESS", "Open-Meteo CMIP6 API", f"Successfully fetched daily CMIP6 forecast for scenario {scenario}.")
+            # Save to disk cache
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+                df.to_csv(cache_path, index=False)
+            except Exception as ce:
+                print(f"    ⚠️  Failed to write cache {cache_path}: {ce}")
             return df
 
         except Exception as e:
@@ -183,11 +202,24 @@ def fetch_cmip6_district(
                 continue
             print(f"    ⚠️  [{district}] Open-Meteo API failed ({e}). Using physics-guided fallback.")
             _db_log("FALLBACK", "Open-Meteo CMIP6 API", f"API failed: {e}. Reverting to physics-guided CMIP6 simulation.")
-            return _physics_guided_fallback_df(district, scenario, start_year, end_year)
+            fallback_df = _physics_guided_fallback_df(district, scenario, start_year, end_year)
+            # Save fallback to cache to avoid hitting the failing API repeatedly
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+                fallback_df.to_csv(cache_path, index=False)
+            except Exception as ce:
+                print(f"    ⚠️  Failed to write cache {cache_path}: {ce}")
+            return fallback_df
 
     # All retries exhausted
     _db_log("FALLBACK", "Open-Meteo CMIP6 API", "API retries exhausted. Reverting to physics-guided CMIP6 simulation.")
-    return _physics_guided_fallback_df(district, scenario, start_year, end_year)
+    fallback_df = _physics_guided_fallback_df(district, scenario, start_year, end_year)
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        fallback_df.to_csv(cache_path, index=False)
+    except Exception as ce:
+        print(f"    ⚠️  Failed to write cache {cache_path}: {ce}")
+    return fallback_df
 
 
 def _physics_guided_fallback_df(
