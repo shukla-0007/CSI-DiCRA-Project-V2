@@ -10,3 +10,5 @@ netCDF4
 numpy 
 plotly
 requests 
+sqlalchemy
+joblib

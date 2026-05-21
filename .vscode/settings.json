@@ -1,4 +1,53 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    // ── Python ─────────────────────────────────────────────────────────────
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.analysis.extraPaths": ["${workspaceFolder}"],
+
+    // ── Editor ─────────────────────────────────────────────────────────────
+    "editor.formatOnSave": true,
+    "editor.rulers": [100],
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+
+    // ── Explorer ───────────────────────────────────────────────────────────
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+        "*.py": "${capture}.pyc",
+        "requirements.txt": "requirements*.txt",
+        ".gitignore": ".gitattributes, .gitkeep",
+        "docker-compose.yml": "Dockerfile*, .dockerignore"
+    },
+    "explorer.sortOrder": "type",
+
+    // ── Files to hide in explorer (noise reduction) ────────────────────────
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.DS_Store": true,
+        "**/graphify-out": true,
+        "**/.pytest_cache": true
+    },
+
+    // ── File Associations ──────────────────────────────────────────────────
+    "files.associations": {
+        "*.env": "dotenv",
+        "*.db": "sqlite",
+        "requirements*.txt": "pip-requirements"
+    },
+
+    // ── Terminal ───────────────────────────────────────────────────────────
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+
+    // ── Search exclusions ──────────────────────────────────────────────────
+    "search.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/graphify-out": true,
+        "**/.git": true
+    }
 }

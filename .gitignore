@@ -1,2 +1,7 @@
 *.db
-__pychache__/ 
+__pycache__/
+*.pyc
+models/*.pkl
+.DS_Store
+.vscode/
+CSI-DiCRA.code-workspace
