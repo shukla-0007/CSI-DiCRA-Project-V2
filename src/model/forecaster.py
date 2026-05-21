@@ -47,35 +47,229 @@ def yield_to_tier(predicted_yield: float, crop: str) -> int:
     return 1
 
 
-def load_cmip6_mock_data(scenario: str, crop: str) -> pd.DataFrame:
+def generate_physically_guided_fallback(db: Session, district: str, year: int, crop: str, scenario: str) -> dict:
     """
-    Mock CMIP6 data for 2026-2041.  In production this reads a per-crop
-    downscaled NetCDF from IITM Pune for the given SSP scenario.
-    Warming multiplier is slightly higher for SSP5_8.5.
+    Simulates future climate projections by shifting the historical baseline data
+    for the crop's critical window by projected trend factors:
+    - SSP2-4.5: +0.05°C/year warming, -0.001/year soil moisture decline.
+    - SSP5-8.5: +0.10°C/year warming, -0.002/year soil moisture decline.
     """
-    years      = list(range(2026, 2042))
-    multiplier = 1.5 if scenario == "SSP5_8.5" else 1.1
+    from src.database.db import DailyClimate
+    from src.features.phenology_clipper import get_season_months
+    
+    baseline = db.query(DistrictBaselines).filter(
+        DistrictBaselines.district == district,
+        DistrictBaselines.crop     == crop
+    ).first()
+    
+    baseline_tmax = baseline.tmax_95th if baseline else 35.0
+    baseline_sm = baseline.sm_5th if baseline else 0.15
 
+    # Fetch historical daily climate records to model crop critical window conditions
+    hist_records = db.query(DailyClimate).filter(
+        DailyClimate.district == district
+    ).all()
+    
+    if not hist_records:
+        # Randomized generation with trends if database is empty
+        years_diff = year - 2025
+        t_warming = 0.05 * years_diff if scenario == "SSP2_4.5" else 0.10 * years_diff
+        sm_drying = 0.001 * years_diff if scenario == "SSP2_4.5" else 0.002 * years_diff
+        
+        sim_tmax = np.random.uniform(28.0 + t_warming, 42.0 + t_warming, 30)
+        sim_sm = np.random.uniform(max(0.01, 0.15 - sm_drying - 0.05), max(0.02, 0.15 - sm_drying + 0.05), 30)
+        
+        comp_days = sum(1 for t, sm in zip(sim_tmax, sim_sm) if t > baseline_tmax and sm < baseline_sm)
+        mean_ndvi = np.random.uniform(0.35, 0.65)
+        return {"compound_events": comp_days, "mean_ndvi": mean_ndvi}
+
+    # Filter to critical window months
+    season_months = get_season_months(crop)
+    window_data = [
+        r for r in hist_records 
+        if r.date.month in season_months and r.tmax is not None and r.soil_moisture is not None
+    ]
+    
+    if not window_data:
+        window_data = hist_records
+        
+    years_diff = year - 2025
+    t_warming = 0.05 * years_diff if scenario == "SSP2_4.5" else 0.10 * years_diff
+    sm_drying = 0.001 * years_diff if scenario == "SSP2_4.5" else 0.002 * years_diff
+    
+    # Shift historical data by climate trends
+    future_tmax = [r.tmax + t_warming for r in window_data]
+    future_sm = [max(0.01, r.soil_moisture - sm_drying) for r in window_data]
+    
+    comp_days_all = sum(1 for t, sm in zip(future_tmax, future_sm) if t > baseline_tmax and sm < baseline_sm)
+    
+    unique_years = len(set(r.date.year for r in window_data))
+    scaled_comp_days = int(round(comp_days_all / unique_years)) if unique_years > 0 else comp_days_all
+    scaled_comp_days = min(30, max(0, scaled_comp_days))
+    
+    ndvi_vals = [r.ndvi for r in window_data if r.ndvi is not None]
+    mean_ndvi = float(np.mean(ndvi_vals)) + np.random.uniform(-0.05, 0.05) if ndvi_vals else np.random.uniform(0.35, 0.65)
+    
+    return {
+        "compound_events": scaled_comp_days,
+        "mean_ndvi": float(np.clip(mean_ndvi, 0.1, 0.9))
+    }
+
+def load_cmip6_netcdf(db: Session, scenario: str, crop: str) -> pd.DataFrame:
+    """
+    Attempts to read CMIP6 projection parameters from local Copernicus/IITM Pune NetCDF files
+    and slices the gridded records to the district centroids.
+    """
+    import xarray as xr
+    from src.pipeline.dicra_fetcher import get_district_coordinates
+    from src.features.phenology_clipper import get_season_months
+    
+    possible_paths = [
+        f"data/raw/cmip6/{scenario.lower()}_{crop.lower()}.nc",
+        f"data/raw/cmip6/{scenario}_{crop}.nc",
+        f"data/raw/cmip6/{scenario.lower()}.nc",
+        f"data/raw/cmip6/{scenario}.nc",
+    ]
+    
+    nc_path = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            nc_path = p
+            break
+        abs_p = f"/Users/sigma-7/Documents/CSI-DiCRA-Project/CSI-DiCRA-Project/{p}"
+        if os.path.exists(abs_p):
+            nc_path = abs_p
+            break
+            
+    if not nc_path:
+        return None
+        
+    print(f"📖 Ingesting CMIP6 projections from NetCDF: {nc_path}")
+    try:
+        ds = xr.open_dataset(nc_path)
+        
+        tmax_var = None
+        sm_var = None
+        for v in ds.variables:
+            v_lower = v.lower()
+            if 'tmax' in v_lower or 'tasmax' in v_lower:
+                tmax_var = v
+            elif 'soil' in v_lower or 'sm' in v_lower or 'mrso' in v_lower or 'gwetroot' in v_lower:
+                sm_var = v
+                
+        if not tmax_var or not sm_var:
+            print(f"⚠️ Temperature/Soil Moisture variables not found in NetCDF. Available: {list(ds.variables)}")
+            ds.close()
+            return None
+            
+        lat_coord = None
+        lon_coord = None
+        time_coord = None
+        for c in ds.coords:
+            c_lower = c.lower()
+            if 'lat' in c_lower:
+                lat_coord = c
+            elif 'lon' in c_lower or 'lng' in c_lower:
+                lon_coord = c
+            elif 'time' in c_lower or 'date' in c_lower:
+                time_coord = c
+                
+        if not lat_coord or not lon_coord or not time_coord:
+            print(f"⚠️ NetCDF dimensions are missing lat/lon/time mapping. Available: {list(ds.coords)}")
+            ds.close()
+            return None
+            
+        years = list(range(2026, 2042))
+        rows = []
+        
+        for district in MP_DISTRICTS:
+            lat, lon = get_district_coordinates(district)
+            ds_sliced = ds.sel({lat_coord: lat, lon_coord: lon}, method='nearest')
+            
+            baseline = db.query(DistrictBaselines).filter(
+                DistrictBaselines.district == district,
+                DistrictBaselines.crop     == crop
+            ).first()
+            baseline_tmax = baseline.tmax_95th if baseline else 35.0
+            baseline_sm = baseline.sm_5th if baseline else 0.15
+            
+            times = pd.to_datetime(ds_sliced[time_coord].values)
+            tmax_vals = ds_sliced[tmax_var].values
+            sm_vals = ds_sliced[sm_var].values
+            
+            # Kelvin to Celsius conversion if applicable
+            if np.nanmean(tmax_vals) > 100.0:
+                tmax_vals = tmax_vals - 273.15
+                
+            slice_df = pd.DataFrame({
+                "date": times,
+                "tmax": tmax_vals,
+                "soil_moisture": sm_vals
+            }).dropna()
+            
+            for year in years:
+                from src.features.phenology_clipper import CROP_CALENDARS
+                cal = CROP_CALENDARS[crop]
+                start_year = year + cal["start_year_offset"]
+                start_date = pd.Timestamp(f"{start_year}-{cal['critical_start']}")
+                end_date = pd.Timestamp(f"{year}-{cal['critical_end']}")
+                
+                window_df = slice_df[(slice_df['date'] >= start_date) & (slice_df['date'] <= end_date)]
+                
+                if window_df.empty:
+                    fallback_res = generate_physically_guided_fallback(db, district, year, crop, scenario)
+                    rows.append({
+                        "district": district,
+                        "year": year,
+                        "compound_events": fallback_res["compound_events"],
+                        "mean_ndvi": fallback_res["mean_ndvi"]
+                    })
+                else:
+                    comp_events = sum(
+                        1 for _, r in window_df.iterrows()
+                        if r["tmax"] > baseline_tmax and r["soil_moisture"] < baseline_sm
+                    )
+                    fallback_res = generate_physically_guided_fallback(db, district, year, crop, scenario)
+                    rows.append({
+                        "district": district,
+                        "year": year,
+                        "compound_events": comp_events,
+                        "mean_ndvi": fallback_res["mean_ndvi"]
+                    })
+                    
+        ds.close()
+        return pd.DataFrame(rows)
+    except Exception as e:
+        print(f"❌ Error reading NetCDF: {e}. Falling back to physically-guided simulation.")
+        return None
+
+def load_cmip6_data(db: Session, scenario: str, crop: str) -> pd.DataFrame:
+    """
+    Ingests CMIP6 climate projections. Tries to load NetCDF files via xarray/netcdf4.
+    Falls back to physically-guided simulation if NetCDF files are absent.
+    """
+    df = load_cmip6_netcdf(db, scenario, crop)
+    if df is not None and not df.empty:
+        return df
+        
+    print(f"🌱 Generating physically-guided CMIP6 projections for {scenario} / {crop}...")
     rows = []
+    years = list(range(2026, 2042))
     for district in MP_DISTRICTS:
         for year in years:
-            base_events  = 5
-            future_events= int(base_events * multiplier * (year - 2025) / 5)
+            res = generate_physically_guided_fallback(db, district, year, crop, scenario)
             rows.append({
-                "district":       district,
-                "year":           year,
-                "compound_events": max(0, min(20, future_events)),
-                "mean_ndvi":       np.random.uniform(0.25, 0.70),
+                "district": district,
+                "year": year,
+                "compound_events": res["compound_events"],
+                "mean_ndvi": res["mean_ndvi"]
             })
     return pd.DataFrame(rows)
-
 
 def generate_forecasts():
     """
     For every combination of (scenario, crop), load the crop-specific model,
     pull season-aware baselines, and write RiskPredictions rows.
-
-    Total rows: 2 scenarios × 6 crops × 52 districts × 16 years = 9,984 rows.
     """
     db = SessionLocal()
 
@@ -83,13 +277,13 @@ def generate_forecasts():
         for crop in SUPPORTED_CROPS:
             model_path = f"models/xgboost_{crop.lower()}_model.pkl"
             if not os.path.exists(model_path):
-                print(f"⚠️  Model not found for {crop} ({model_path}). "
+                print(f"⚠️ Model not found for {crop} ({model_path}). "
                       f"Run train_all_models() first. Skipping.")
                 continue
 
             model    = joblib.load(model_path)
-            cmip6_df = load_cmip6_mock_data(scenario, crop)
-            print(f"🔮 Generating: {scenario} / {crop} ({len(cmip6_df)} rows)...")
+            cmip6_df = load_cmip6_data(db, scenario, crop)
+            print(f"🔮 Generating forecasts: {scenario} / {crop} ({len(cmip6_df)} rows)...")
 
             for _, row in cmip6_df.iterrows():
                 baseline = db.query(DistrictBaselines).filter(

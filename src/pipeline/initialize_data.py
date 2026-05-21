@@ -9,6 +9,8 @@ from src.features.dynamic_baselines import calculate_district_baselines
 from src.features.phenology_clipper import SUPPORTED_CROPS
 from src.model.train_xgboost import train_all_models
 from src.model.forecaster import generate_forecasts
+from src.pipeline.dicra_fetcher import fetch_dicra_data
+from src.pipeline.imd_spi_calculator import fetch_chirps_precipitation
 
 MP_DISTRICTS = [
     "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani", "Betul", "Bhind", 
@@ -21,70 +23,55 @@ MP_DISTRICTS = [
 ]
 
 def generate_bulk_climate_data():
-    """Generates daily climate data for all districts from 2017-01-01 to 2026-05-31 in bulk."""
+    """Syncs daily climate variables from NASA POWER and Sentinel-10m NDVI in bulk from 2017-01-01 to 2026-05-31."""
     db = SessionLocal()
     
     # Check if we already have daily climate data
     existing_count = db.query(DailyClimate).count()
     if existing_count > 0:
-        print(f"ℹ️ daily_climate table already contains {existing_count} records. Skipping climate simulation.")
+        print(f"ℹ️ daily_climate table already contains {existing_count} records. Skipping API synchronization.")
         db.close()
         return
 
-    print("📡 Simulating 10-year daily climate history (2017-2026) for all 52 districts...")
-    start_date = datetime(2017, 1, 1).date()
-    end_date = datetime(2026, 5, 31).date()
-    total_days = (end_date - start_date).days + 1
-    
-    date_list = [start_date + timedelta(days=x) for x in range(total_days)]
+    print("📡 Syncing 10-year historical climate data (2017-2026) using NASA POWER API...")
+    start_date = "2017-01-01"
+    end_date = "2026-05-31"
     
     records = []
-    # Seed random number generator for reproducibility
-    np.random.seed(42)
-    
-    print(f"📊 Generating {len(MP_DISTRICTS) * total_days} daily records...")
     
     for district in MP_DISTRICTS:
-        # We can pre-generate numpy arrays for speed
-        tmax_base = np.random.uniform(28.0, 42.0, total_days)
-        sm_base = np.random.uniform(0.04, 0.38, total_days)
-        precip_base = np.random.exponential(scale=4.0, size=total_days)
-        precip_base[precip_base < 1.5] = 0.0
-        ndvi_base = np.random.uniform(0.15, 0.75, total_days)
+        print(f"🔄 Syncing weather variables for {district}...")
         
-        for idx, d in enumerate(date_list):
-            # Seasonal adjustments (temperature higher in summer, SM higher in monsoon)
-            month = d.month
-            t_adj = 0.0
-            sm_adj = 0.0
-            
-            # April-June is peak summer
-            if month in [4, 5, 6]:
-                t_adj = 3.0
-                sm_adj = -0.05
-            # July-September is monsoon
-            elif month in [7, 8, 9]:
-                t_adj = -2.0
-                sm_adj = 0.12
-            # December-January is winter
-            elif month in [12, 1]:
-                t_adj = -5.0
-                sm_adj = -0.02
-                
+        # 1. Fetch temperature, soil moisture, and NDVI from NASA POWER + Sentinel vector NDVI
+        dicra_df = fetch_dicra_data(district, start_date, end_date)
+        
+        # 2. Fetch daily precipitation (PRECTOTCORR)
+        precip_df = fetch_chirps_precipitation(district, start_date, end_date)
+        
+        # 3. Merge the datasets
+        merged_df = pd.merge(dicra_df, precip_df, on=["date", "district"], how="inner")
+        
+        for _, row in merged_df.iterrows():
+            d_val = row["date"].date() if hasattr(row["date"], "date") else row["date"]
             records.append({
-                "date": d,
-                "district": district,
-                "tmax": float(np.clip(tmax_base[idx] + t_adj, 15.0, 48.0)),
-                "soil_moisture": float(np.clip(sm_base[idx] + sm_adj, 0.01, 0.50)),
-                "precipitation": float(precip_base[idx] * (2.0 if month in [7, 8, 9] else 0.2)),
-                "ndvi": float(np.clip(ndvi_base[idx] + (0.15 if month in [8, 9, 10] else -0.05), 0.05, 0.90))
+                "date": d_val,
+                "district": row["district"],
+                "tmax": float(row["tmax"]) if row["tmax"] is not None else None,
+                "soil_moisture": float(row["soil_moisture"]) if row["soil_moisture"] is not None else None,
+                "precipitation": float(row["precipitation"]) if row["precipitation"] is not None else None,
+                "ndvi": float(row["ndvi"]) if row["ndvi"] is not None else None
             })
             
-    # Bulk insert for efficiency
-    print("💾 Bulk inserting climate records to database...")
-    db.execute(insert(DailyClimate), records)
-    db.commit()
-    print(f"✅ Synced {db.query(DailyClimate).count()} climate records successfully.")
+        print(f"✅ Prepared {len(merged_df)} daily records for {district}.")
+        
+    if records:
+        print(f"💾 Bulk inserting {len(records)} climate records into daily_climate table...")
+        db.execute(insert(DailyClimate), records)
+        db.commit()
+        print("✅ DailyClimate records synchronized and populated successfully.")
+    else:
+        print("⚠️ No records were prepared for synchronization.")
+        
     db.close()
 
 def main():
