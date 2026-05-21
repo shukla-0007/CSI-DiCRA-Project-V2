@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from src.database.db import get_db, RiskPredictions, DistrictBaselines
+from src.database.db import get_db, RiskPredictions, DistrictBaselines, APILog
 from src.features.phenology_clipper import SUPPORTED_CROPS
 import uvicorn
 
@@ -125,6 +125,26 @@ def get_baselines(
 def list_supported_crops():
     """Returns the list of crops the system supports."""
     return {"supported_crops": SUPPORTED_CROPS}
+
+
+@app.get("/api/v1/health/api_status")
+def get_api_status(db: Session = Depends(get_db)):
+    """
+    Returns the latest 50 API logs from the system for developer diagnostics,
+    including successful calls and fallback events.
+    """
+    logs = db.query(APILog).order_by(APILog.timestamp.desc()).limit(50).all()
+    return [
+        {
+            "id":        log.id,
+            "timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else None,
+            "service":   log.service,
+            "district":  log.district,
+            "status":    log.status,
+            "message":   log.message,
+        }
+        for log in logs
+    ]
 
 
 if __name__ == "__main__":

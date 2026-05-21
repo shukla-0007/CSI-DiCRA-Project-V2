@@ -42,16 +42,21 @@ def generate_training_data(db: Session, crop: str):
         if not climate:
             continue
 
-        compound_events = sum(
-            1 for c in climate
-            if c.tmax is not None and c.soil_moisture is not None
-            and c.tmax          > baseline.tmax_95th
-            and c.soil_moisture < baseline.sm_5th
-        )
-        mean_ndvi = float(np.mean([c.ndvi for c in climate if c.ndvi is not None])) \
-                    if any(c.ndvi is not None for c in climate) else 0.5
+        # Extract features
+        valid_tmax = [c.tmax for c in climate if c.tmax is not None]
+        valid_sm = [c.soil_moisture for c in climate if c.soil_moisture is not None]
+        valid_ndvi = [c.ndvi for c in climate if c.ndvi is not None]
+        valid_precip = [c.precipitation for c in climate if c.precipitation is not None]
 
-        features.append([compound_events, mean_ndvi, baseline.tmax_95th, baseline.sm_5th])
+        mean_tmax = float(np.mean(valid_tmax)) if valid_tmax else 30.0
+        mean_sm = float(np.mean(valid_sm)) if valid_sm else 0.15
+        mean_ndvi = float(np.mean(valid_ndvi)) if valid_ndvi else 0.5
+        tot_precip = float(np.sum(valid_precip)) if valid_precip else 0.0
+
+        tmax_anomaly = mean_tmax - baseline.tmax_95th
+        sm_anomaly = mean_sm - baseline.sm_5th
+
+        features.append([mean_tmax, mean_sm, mean_ndvi, tot_precip, tmax_anomaly, sm_anomaly])
         labels.append(y.yield_kg_ha)
 
     return np.array(features), np.array(labels)

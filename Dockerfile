@@ -9,12 +9,15 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copy the application code and the trained model
+# 4. Copy the application code, data, models, and the database
 COPY src/ /app/src/
+COPY data/ /app/data/
+COPY models/ /app/models/
+COPY dicra_csi.db /app/dicra_csi.db
 
-# 5. Expose the port the app runs on
+# 5. Expose the ports for FastAPI (8000) and Streamlit (8501)
 EXPOSE 8000
+EXPOSE 8501
 
 # 6. Command to run the FastAPI application
-# Notice we point to 'src.main:app' because the code is inside the src/ folder
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

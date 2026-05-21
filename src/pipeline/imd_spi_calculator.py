@@ -6,7 +6,7 @@ import numpy as np
 import scipy.stats as stats
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from src.database.db import SessionLocal, DailyClimate
+from src.database.db import SessionLocal, DailyClimate, log_api_status
 from src.pipeline.dicra_fetcher import MP_DISTRICTS, get_district_coordinates
 
 def fetch_chirps_precipitation(district_name: str, start_date: str, end_date: str):
@@ -14,6 +14,15 @@ def fetch_chirps_precipitation(district_name: str, start_date: str, end_date: st
     Fetch daily precipitation (PRECTOTCORR) from NASA POWER API.
     Uses district coordinates mapping.
     """
+    def _db_log(status: str, service: str, message: str):
+        db = SessionLocal()
+        try:
+            log_api_status(db, service, district_name, status, message)
+        except Exception as e:
+            print(f"Logging error: {e}")
+        finally:
+            db.close()
+
     lat, lon = get_district_coordinates(district_name)
     start_str = start_date.replace("-", "")
     end_str = end_date.replace("-", "")
@@ -55,9 +64,11 @@ def fetch_chirps_precipitation(district_name: str, start_date: str, end_date: st
                 "district": district_name,
                 "precipitation": precip_vals
             })
+            _db_log("SUCCESS", "NASA POWER Precipitation API", f"Successfully fetched daily precipitation records.")
             return df
     except Exception as e:
         print(f"❌ NASA POWER connection failed for {district_name} precipitation: {e}. Using fallback.")
+        _db_log("FALLBACK", "NASA POWER Precipitation API", f"API connection failed: {e}. Falling back to daily simulation.")
         
     # Fallback to daily precipitation simulation
     dates = pd.date_range(start=start_date, end=end_date)

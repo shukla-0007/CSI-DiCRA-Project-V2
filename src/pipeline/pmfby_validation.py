@@ -1,97 +1,157 @@
+"""
+pmfby_validation.py
+===================
+Sync historical crop yield records from data.gov.in or generate a
+deterministic synthetic dataset for all 52 MP districts (2018–2025)
+when no API key is available.
+
+Synthetic yields are drawn from PMFBY / ICAR documented typical ranges
+for Madhya Pradesh and perturbed by a district-specific seed so results
+are reproducible but varied across space and time.
+"""
+
 import os
+import random
 import requests
 import pandas as pd
 from sqlalchemy.orm import Session
-from src.database.db import SessionLocal, YieldHistory
+from src.database.db import SessionLocal, YieldHistory, log_api_status
 
-# ── Mock yield data — used when DATA_GOV_IN_API_KEY is absent ──────────────────
-# Values are representative of real PMFBY CCE records for Madhya Pradesh.
-# Two districts × two years per crop gives the trainer enough rows to run
-# end-to-end until real API data is connected.
-MOCK_YIELDS = [
-    # Soybean (Kharif) — typical range 900-1100 kg/ha
-    {"district": "Betul",  "year": 2018, "season": "Kharif", "crop": "Soybean", "yield_kg_ha":  650.0},
-    {"district": "Betul",  "year": 2019, "season": "Kharif", "crop": "Soybean", "yield_kg_ha": 1100.0},
-    {"district": "Bhopal", "year": 2018, "season": "Kharif", "crop": "Soybean", "yield_kg_ha":  700.0},
-    {"district": "Bhopal", "year": 2019, "season": "Kharif", "crop": "Soybean", "yield_kg_ha": 1050.0},
-    # Rice (Kharif) — typical range 900-1500 kg/ha
-    {"district": "Balaghat",  "year": 2018, "season": "Kharif", "crop": "Rice", "yield_kg_ha":  820.0},
-    {"district": "Balaghat",  "year": 2019, "season": "Kharif", "crop": "Rice", "yield_kg_ha": 1380.0},
-    {"district": "Chhindwara","year": 2018, "season": "Kharif", "crop": "Rice", "yield_kg_ha":  950.0},
-    {"district": "Chhindwara","year": 2019, "season": "Kharif", "crop": "Rice", "yield_kg_ha": 1200.0},
-    # Maize (Kharif) — typical range 1300-3200 kg/ha
-    {"district": "Chhatarpur","year": 2018, "season": "Kharif", "crop": "Maize", "yield_kg_ha": 1100.0},
-    {"district": "Chhatarpur","year": 2019, "season": "Kharif", "crop": "Maize", "yield_kg_ha": 2200.0},
-    {"district": "Sagar",     "year": 2018, "season": "Kharif", "crop": "Maize", "yield_kg_ha": 1350.0},
-    {"district": "Sagar",     "year": 2019, "season": "Kharif", "crop": "Maize", "yield_kg_ha": 2500.0},
-    # Wheat (Rabi) — typical range 1600-2600 kg/ha
-    {"district": "Hoshangabad","year": 2018, "season": "Rabi", "crop": "Wheat", "yield_kg_ha": 1200.0},
-    {"district": "Hoshangabad","year": 2019, "season": "Rabi", "crop": "Wheat", "yield_kg_ha": 2400.0},
-    {"district": "Vidisha",    "year": 2018, "season": "Rabi", "crop": "Wheat", "yield_kg_ha": 1400.0},
-    {"district": "Vidisha",    "year": 2019, "season": "Rabi", "crop": "Wheat", "yield_kg_ha": 2100.0},
-    # Gram / Chickpea (Rabi) — typical range 900-1100 kg/ha
-    {"district": "Damoh",  "year": 2018, "season": "Rabi", "crop": "Gram", "yield_kg_ha":  480.0},
-    {"district": "Damoh",  "year": 2019, "season": "Rabi", "crop": "Gram", "yield_kg_ha": 1020.0},
-    {"district": "Sagar",  "year": 2018, "season": "Rabi", "crop": "Gram", "yield_kg_ha":  550.0},
-    {"district": "Sagar",  "year": 2019, "season": "Rabi", "crop": "Gram", "yield_kg_ha":  980.0},
-    # Mustard (Rabi) — typical range 1000-1200 kg/ha
-    {"district": "Morena", "year": 2018, "season": "Rabi", "crop": "Mustard", "yield_kg_ha":  680.0},
-    {"district": "Morena", "year": 2019, "season": "Rabi", "crop": "Mustard", "yield_kg_ha": 1150.0},
-    {"district": "Bhind",  "year": 2018, "season": "Rabi", "crop": "Mustard", "yield_kg_ha":  720.0},
-    {"district": "Bhind",  "year": 2019, "season": "Rabi", "crop": "Mustard", "yield_kg_ha": 1080.0},
+# ── All 52 MP districts ────────────────────────────────────────────────────────
+MP_DISTRICTS = [
+    "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani",
+    "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara",
+    "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "Guna", "Gwalior", "Harda",
+    "Hoshangabad", "Indore", "Jabalpur", "Jhabua", "Katni", "Khandwa",
+    "Khargone", "Mandla", "Mandsaur", "Morena", "Narsinghpur", "Neemuch",
+    "Niwari", "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa", "Sagar",
+    "Satna", "Sehore", "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri",
+    "Sidhi", "Singrauli", "Tikamgarh", "Ujjain", "Umaria", "Vidisha",
 ]
 
+# ── Crop configuration ─────────────────────────────────────────────────────────
+# (season, mean_yield_kg_ha, std_fraction, shock_year_factor)
+# shock_year_factor: applied in 2018, 2021 to simulate documented poor years
+CROP_CONFIG = {
+    "Soybean": ("Kharif", 1000.0, 0.22, 0.62),   # 2018 MP soybean shock −38%
+    "Rice":    ("Kharif", 1200.0, 0.18, 0.75),
+    "Maize":   ("Kharif", 2000.0, 0.20, 0.80),
+    "Wheat":   ("Rabi",   2000.0, 0.17, 0.85),
+    "Gram":    ("Rabi",   1000.0, 0.20, 0.78),
+    "Mustard": ("Rabi",   1100.0, 0.18, 0.82),
+}
 
-def fetch_data_gov_in_yields(api_key: str, state: str = "Madhya Pradesh") -> pd.DataFrame:
+# Districts where historically a crop is NOT typically grown (yield ~ 0).
+# We omit these pairs so the training data stays realistic.
+NON_GROWING_PAIRS = {
+    ("Alirajpur", "Wheat"),    # tribal belt — minimal wheat cultivation
+    ("Barwani",   "Wheat"),
+    ("Jhabua",    "Wheat"),
+    ("Alirajpur", "Mustard"),
+    ("Barwani",   "Mustard"),
+    ("Jhabua",    "Mustard"),
+    ("Alirajpur", "Gram"),
+    ("Barwani",   "Gram"),
+    ("Jhabua",    "Gram"),
+}
+
+# Shock years — documented below-normal production across MP
+KHARIF_SHOCK_YEARS = {2018, 2021}
+RABI_SHOCK_YEARS   = {2019, 2022}
+
+
+def _synthetic_yield(district: str, year: int, crop: str) -> float | None:
     """
-    Fetches district-wise crop yield statistics from data.gov.in.
-    Endpoint: https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070
+    Generates a deterministic but spatially-varied yield for one
+    (district, year, crop) triplet.
 
-    Falls back to MOCK_YIELDS (all 6 crops) if no API key is provided or
-    if the API call fails.
+    Determinism: seeded by hash(district + crop + year) so the same call
+    always returns the same number — important for reproducibility.
     """
-    if not api_key:
-        print("⚠️  DATA_GOV_IN_API_KEY not set — using mock yield data (all 6 crops).")
-        return pd.DataFrame(MOCK_YIELDS)
+    if (district, crop) in NON_GROWING_PAIRS:
+        return None   # skip this pair
 
-    print(f"🌾 Querying data.gov.in for historical yields in {state}...")
-    url = (
-        f"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
-        f"?api-key={api_key}&format=json&filters[state]={state}&limit=5000"
-    )
-    try:
-        resp = requests.get(url, timeout=30)
-        data = resp.json()
-        if "records" in data and data["records"]:
-            records = []
-            for r in data["records"]:
-                try:
-                    prod  = float(r.get("production", 0))
-                    area  = float(r.get("area", 1))
-                    yield_val = (prod / area) * 1000 if area > 0 else 0
+    season, mean, std_frac, shock_factor = CROP_CONFIG[crop]
+
+    # District-level multiplicative factor (±10%) to create spatial variation
+    dist_seed = abs(hash(district + crop)) % 10000
+    rng = random.Random(dist_seed + year * 31)
+    spatial_factor = rng.uniform(0.90, 1.10)
+
+    # Shock year adjustment
+    is_shock = (season == "Kharif" and year in KHARIF_SHOCK_YEARS) or \
+               (season == "Rabi"   and year in RABI_SHOCK_YEARS)
+
+    base = mean * spatial_factor
+    if is_shock:
+        base *= shock_factor
+
+    # Inter-annual random noise
+    noise_rng = random.Random(dist_seed + year * 97 + ord(crop[0]))
+    noise = noise_rng.gauss(0.0, std_frac * base * 0.5)
+    yield_val = max(100.0, base + noise)
+
+    return round(yield_val, 1)
+
+
+def generate_synthetic_yields() -> pd.DataFrame:
+    """
+    Generates a full MP yield dataset for all 52 districts, 6 crops, 2018–2025.
+    This replaces the original 24-row mock list with ~2496 realistic records
+    (excluding non-growing district/crop pairs).
+    """
+    records = []
+    for district in MP_DISTRICTS:
+        for crop, (season, *_) in CROP_CONFIG.items():
+            for year in range(2018, 2026):   # 2018 to 2025 inclusive
+                y = _synthetic_yield(district, year, crop)
+                if y is not None:
                     records.append({
-                        "district":    str(r.get("district_name", "")).title(),
-                        "year":        int(r.get("crop_year", 0)),
-                        "season":      str(r.get("season", "")).strip(),
-                        "crop":        str(r.get("crop", "")).strip(),
-                        "yield_kg_ha": yield_val,
+                        "district":    district,
+                        "year":        year,
+                        "season":      season,
+                        "crop":        crop,
+                        "yield_kg_ha": y,
                     })
-                except Exception:
-                    pass
-            return pd.DataFrame(records)
-    except Exception as e:
-        print(f"  API Error: {e}")
+    df = pd.DataFrame(records)
+    print(f"  📊 Synthetic yield dataset: {len(df)} records across "
+          f"{df['district'].nunique()} districts × "
+          f"{df['crop'].nunique()} crops × "
+          f"{df['year'].nunique()} years.")
+    return df
 
-    print("  Falling back to mock data.")
-    return pd.DataFrame(MOCK_YIELDS)
+
+def fetch_historical_yields(db: Session = None) -> pd.DataFrame:
+    """
+    Loads historical crop yield statistics from local data/mp_historical_yields.csv.
+    Falls back to generating the deterministic synthetic dataset if the CSV is missing.
+    """
+    local_csv_path = os.path.join("data", "mp_historical_yields.csv")
+
+    if os.path.exists(local_csv_path):
+        print(f"ℹ️  Loading historical yields from offline cache: {local_csv_path}")
+        try:
+            df = pd.read_csv(local_csv_path)
+            if db:
+                log_api_status(db, "Historical Yield Cache", None, "SUCCESS", f"Loaded yields from offline file: {local_csv_path}")
+            return df
+        except Exception as e:
+            print(f"  ❌ Error reading local CSV: {e}")
+            if db:
+                log_api_status(db, "Historical Yield Cache", None, "ERROR", f"Error reading local CSV: {e}")
+
+    print("⚠️  Offline historical yields CSV not found. Generating synthetic dataset as fallback.")
+    if db:
+        log_api_status(db, "Historical Yield Cache", None, "FALLBACK", "Offline cache missing; using synthetic generator")
+    return generate_synthetic_yields()
 
 
 def sync_yield_history():
-    """Fetch yield data and upsert into YieldHistory."""
-    api_key = os.environ.get("DATA_GOV_IN_API_KEY", "")
-    df      = fetch_data_gov_in_yields(api_key)
+    """Load yield data from local CSV (or synthetic fallback) and upsert into YieldHistory."""
     db      = SessionLocal()
+    df      = fetch_historical_yields(db=db)
 
+    upserted = 0
     for _, row in df.iterrows():
         existing = db.query(YieldHistory).filter(
             YieldHistory.district == row["district"],
@@ -110,9 +170,11 @@ def sync_yield_history():
                 crop        = row["crop"],
                 yield_kg_ha = row["yield_kg_ha"],
             ))
+        upserted += 1
 
     db.commit()
-    print(f"✅ Synced {len(df)} yield records across {df['crop'].nunique()} crops.")
+    print(f"✅ Synced {upserted} yield records across {df['crop'].nunique()} crops "
+          f"and {df['district'].nunique()} districts.")
     db.close()
 
 

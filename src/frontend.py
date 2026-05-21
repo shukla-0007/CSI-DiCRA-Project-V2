@@ -702,7 +702,7 @@ with right:
         for t_val, t_color in tier_colors.items():
             fig.add_hline(y=t_val, line_dash="dot", line_color=t_color, opacity=0.2, line_width=1)
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.info(
             f"No trajectory data available for {crop} in {district}. "

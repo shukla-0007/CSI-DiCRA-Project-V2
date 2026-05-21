@@ -1,12 +1,40 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date
-from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import date
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from datetime import date, datetime
 
 DATABASE_URL = "sqlite:///dicra_csi.db"
 
 engine       = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base         = declarative_base()
+
+
+class APILog(Base):
+    """Logs for tracking external API queries, fallbacks, and execution status."""
+    __tablename__ = "api_logs"
+
+    id        = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    service   = Column(String,  index=True, nullable=False)   # e.g. "DiCRA API", "NASA POWER", "Open-Meteo CMIP6", "data.gov.in"
+    district  = Column(String,  index=True, nullable=True)
+    status    = Column(String,  index=True, nullable=False)   # "SUCCESS", "FALLBACK", "FAILED"
+    message   = Column(String,  nullable=True)
+
+
+def log_api_status(db: Session, service: str, district: str | None, status: str, message: str | None = None):
+    """Helper to insert and commit an API status log to the database."""
+    try:
+        log = APILog(
+            service=service,
+            district=district,
+            status=status,
+            message=message
+        )
+        db.add(log)
+        db.commit()
+    except Exception as e:
+        print(f"⚠️ Failed to write API status log for {service}: {e}")
+
 
 
 class DailyClimate(Base):
