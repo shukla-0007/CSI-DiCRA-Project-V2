@@ -1,13 +1,70 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Security, status
+from fastapi.security import APIKeyHeader
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from src.database.db import get_db, RiskPredictions, DistrictBaselines, APILog, log_api_status
 from src.features.phenology_clipper import SUPPORTED_CROPS
+import os
+import secrets
 import uvicorn
 
+# ── API KEY SECURITY SETUP ───────────────────────────────────────────────────
+API_KEY_NAME = "X-API-KEY"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+def get_or_create_api_key() -> str:
+    """Retrieve API key from environment variable or read/generate from .csi_api_key file."""
+    key = os.environ.get("CSI_API_KEY", "").strip()
+    if key:
+        return key
+
+    key_file = ".csi_api_key"
+    if os.path.exists(key_file):
+        try:
+            with open(key_file, "r") as f:
+                val = f.read().strip()
+                if val:
+                    return val
+        except Exception as e:
+            print(f"⚠️ Error reading {key_file}: {e}")
+
+    new_key = secrets.token_hex(32)
+    try:
+        with open(key_file, "w") as f:
+            f.write(new_key)
+        print(f"🔒 Generated new secure API key and wrote to {key_file}")
+        return new_key
+    except Exception as e:
+        print(f"⚠️ Could not write {key_file}: {e}. Using transient key.")
+        return new_key
+
+CSI_API_KEY = get_or_create_api_key()
+
+def validate_api_key(header_value: str = Security(api_key_header)):
+    if not CSI_API_KEY:
+        return
+    if header_value == CSI_API_KEY:
+        return header_value
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Invalid or missing API Key. Add 'X-API-KEY' header."
+    )
+
+# ── APP INITIALIZATION & CORS ─────────────────────────────────────────────────
 app = FastAPI(
     title       = "CSI-DiCRA Compound Stress Index API",
     description = "Actuarial climate risk tiers for agricultural insurance — Madhya Pradesh.",
     version     = "2.1.0",
+    dependencies = [Depends(validate_api_key)],
+)
+
+allowed_origins = os.environ.get("CSI_ALLOWED_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

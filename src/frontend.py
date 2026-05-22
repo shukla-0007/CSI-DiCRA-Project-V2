@@ -3,8 +3,30 @@ import pandas as pd
 import requests
 import plotly.graph_objects as go
 
+import os
+
 # ── Config ─────────────────────────────────────────────────────────────────────
 API_URL = "http://localhost:8000/api/v1"
+
+def load_api_key() -> str:
+    """Load the API key from environment variable or fall back to reading from .csi_api_key."""
+    key = os.environ.get("CSI_API_KEY", "").strip()
+    if key:
+        return key
+
+    key_file = ".csi_api_key"
+    if os.path.exists(key_file):
+        try:
+            with open(key_file, "r") as f:
+                val = f.read().strip()
+                if val:
+                    return val
+        except Exception:
+            pass
+    return ""
+
+CSI_API_KEY = load_api_key()
+HEADERS = {"X-API-KEY": CSI_API_KEY} if CSI_API_KEY else {}
 
 st.set_page_config(
     page_title="CSI-DiCRA | Farmer Advisory",
@@ -547,7 +569,7 @@ with st.sidebar:
     last_sync_msg = "No sync logged yet."
 
     try:
-        status_resp = requests.get(f"{API_URL}/health/api_status", timeout=2)
+        status_resp = requests.get(f"{API_URL}/health/api_status", headers=HEADERS, timeout=2)
         if status_resp.status_code == 200:
             logs = status_resp.json()
             scheduler_logs = [log for log in logs if log.get("service") == "Pipeline Scheduler"]
@@ -576,7 +598,7 @@ with st.sidebar:
 
     if st.button("Sync Now 🔄", key="sync_now_btn", use_container_width=True):
         try:
-            sync_resp = requests.post(f"{API_URL}/pipeline/sync?incremental=true&safety_days=15", timeout=2)
+            sync_resp = requests.post(f"{API_URL}/pipeline/sync?incremental=true&safety_days=15", headers=HEADERS, timeout=2)
             if sync_resp.status_code == 200:
                 st.success("🔄 Climate sync triggered in background!")
                 st.info("Wait ~5-10 seconds and reload the page to see updated CSI results.")
@@ -606,6 +628,7 @@ try:
     resp = requests.get(
         f"{API_URL}/insurance/premium_risk",
         params={"district": district, "year": year, "crop": crop, "scenario": scenario_param},
+        headers=HEADERS,
         timeout=5,
     )
     if resp.status_code == 200:
@@ -622,6 +645,7 @@ try:
     resp2 = requests.get(
         f"{API_URL}/dashboard/trajectory",
         params={"district": district, "crop": crop, "scenario": scenario_param},
+        headers=HEADERS,
         timeout=5,
     )
     if resp2.status_code == 200:
