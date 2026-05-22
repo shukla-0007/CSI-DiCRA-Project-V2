@@ -539,6 +539,52 @@ with st.sidebar:
     </div>
     """.format(scenario=scenario_display), unsafe_allow_html=True)
 
+    # ── System Diagnostics ──────────────────────────────────────────────────────────
+    st.markdown("<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:28px 0 6px;'>System Status</div>", unsafe_allow_html=True)
+
+    last_sync_time = "Never"
+    last_sync_status = "N/A"
+    last_sync_msg = "No sync logged yet."
+
+    try:
+        status_resp = requests.get(f"{API_URL}/health/api_status", timeout=2)
+        if status_resp.status_code == 200:
+            logs = status_resp.json()
+            scheduler_logs = [log for log in logs if log.get("service") == "Pipeline Scheduler"]
+            if scheduler_logs:
+                latest = scheduler_logs[0]
+                last_sync_time = latest.get("timestamp", "N/A")
+                last_sync_status = latest.get("status", "N/A")
+                last_sync_msg = latest.get("message", "No message details.")
+    except Exception as e:
+        last_sync_msg = f"Cannot fetch status: {e}"
+
+    status_color = "#3fb950" if last_sync_status == "SUCCESS" else ("#f85149" if last_sync_status == "FAILED" else "#8b949e")
+
+    st.markdown(f"""
+    <div style='padding:12px;background:#161b22;border:1px solid #21262d;border-radius:8px;'>
+        <div style='font-size:11px;color:#8b949e;'>
+            <b style='color:#c9d1d9;'>Live Climate Sync</b><br><br>
+            📅 Last Run: <span style='color:#c9d1d9;'>{last_sync_time}</span><br>
+            🚦 Status: <span style='color:{status_color};font-weight:bold;'>{last_sync_status}</span><br>
+            📝 Log: <span style='color:#8b949e;font-style:italic;'>{last_sync_msg}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
+
+    if st.button("Sync Now 🔄", key="sync_now_btn", use_container_width=True):
+        try:
+            sync_resp = requests.post(f"{API_URL}/pipeline/sync?incremental=true&safety_days=15", timeout=2)
+            if sync_resp.status_code == 200:
+                st.success("🔄 Climate sync triggered in background!")
+                st.info("Wait ~5-10 seconds and reload the page to see updated CSI results.")
+            else:
+                st.error(f"Failed to trigger sync: HTTP {sync_resp.status_code}")
+        except Exception as e:
+            st.error(f"Error triggering sync: {e}")
+
 # ── Header ──────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="dash-header">

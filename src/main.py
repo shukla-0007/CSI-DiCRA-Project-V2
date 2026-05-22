@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from src.database.db import get_db, RiskPredictions, DistrictBaselines, APILog
+from src.database.db import get_db, RiskPredictions, DistrictBaselines, APILog, log_api_status
 from src.features.phenology_clipper import SUPPORTED_CROPS
 import uvicorn
 
@@ -145,6 +145,54 @@ def get_api_status(db: Session = Depends(get_db)):
         }
         for log in logs
     ]
+
+
+import threading
+import time
+
+def start_scheduler():
+    def run_periodically():
+        # Sleep for a few seconds to let FastAPI spin up fully
+        time.sleep(5)
+        print("⏰ Scheduler: Running initial startup climate sync and forecast regeneration...")
+        try:
+            from src.pipeline.initialize_data import run_pipeline
+            run_pipeline(incremental=True, safety_days=15)
+        except Exception as e:
+            print(f"❌ Scheduler startup run failed: {e}")
+
+        while True:
+            # Sleep for 3 days
+            # 3 days = 3 * 24 * 3600 seconds
+            time.sleep(3 * 24 * 3600)
+            print("⏰ Scheduler: Triggering 3-day periodic climate sync and forecast regeneration...")
+            try:
+                from src.pipeline.initialize_data import run_pipeline
+                run_pipeline(incremental=True, safety_days=15)
+            except Exception as e:
+                print(f"❌ Scheduler periodic run failed: {e}")
+
+    thread = threading.Thread(target=run_periodically, daemon=True)
+    thread.start()
+
+
+@app.on_event("startup")
+def startup_event():
+    start_scheduler()
+
+
+@app.post("/api/v1/pipeline/sync")
+def trigger_pipeline_sync(
+    background_tasks: BackgroundTasks,
+    incremental: bool = True,
+    safety_days: int = 15,
+):
+    """
+    Trigger the live pipeline sync manually in the background.
+    """
+    from src.pipeline.initialize_data import run_pipeline
+    background_tasks.add_task(run_pipeline, incremental=incremental, safety_days=safety_days)
+    return {"message": "Pipeline sync started in background."}
 
 
 if __name__ == "__main__":

@@ -348,9 +348,15 @@ def generate_forecasts():
         3. Compute compound heat+drought events.
         4. Run through the trained XGBoost model.
         5. Assign a Risk Tier (1–5) and CSI score (0.0–1.0).
-        6. Upsert into RiskPredictions.
+        6. Insert into RiskPredictions.
     """
     db = SessionLocal()
+
+    # 1. Truncate the risk_predictions table to prevent duplicate/stale records
+    print("🗑️ Clearing all existing risk predictions...")
+    db.query(RiskPredictions).delete()
+    db.commit()
+
     years = list(range(FORECAST_START_YEAR, FORECAST_END_YEAR + 1))
 
     print(f"\n🔮 Generating CMIP6 forecasts ({FORECAST_START_YEAR}–{FORECAST_END_YEAR})")
@@ -380,23 +386,20 @@ def generate_forecasts():
 
             saved = 0
             for dist_idx, district in enumerate(MP_DISTRICTS, start=1):
-                # Skip if prediction already exists for all years for this scenario/crop/district
-                existing_count = db.query(RiskPredictions).filter(
-                    RiskPredictions.district == district,
-                    RiskPredictions.scenario == scenario,
-                    RiskPredictions.crop     == crop,
-                ).count()
-                if existing_count == len(years):
-                    print(f"    ⏭️  [{district}] Already has predictions for {crop} / {scenario} (skipping)...")
-                    continue
-
                 cache_key = (district, scenario)
                 if cache_key not in cmip6_cache:
-                    print(f"    📡 [{district}] Fetching CMIP6 daily projections from Open-Meteo...")
+                    district_slug = district.replace(" ", "_").replace("-", "_").lower()
+                    cache_path = os.path.join("data", "processed", f"cmip6_{district_slug}_{scenario}.csv")
+                    is_cached = os.path.exists(cache_path)
+
+                    if not is_cached:
+                        print(f"    📡 [{district}] Fetching CMIP6 daily projections from Open-Meteo...")
                     cmip6_df = fetch_cmip6_district(district, scenario)
                     cmip6_cache[cache_key] = cmip6_df
-                    # Polite rate limit — Open-Meteo has 10 req/min limit on free tier
-                    time.sleep(8.0)
+
+                    if not is_cached:
+                        # Polite rate limit — Open-Meteo has 10 req/min limit on free tier
+                        time.sleep(8.0)
                 else:
                     cmip6_df = cmip6_cache[cache_key]
 
@@ -429,25 +432,14 @@ def generate_forecasts():
                     tier            = yield_to_tier(predicted_yield, crop)
                     csi_score       = round(tier / 5.0, 3)
 
-                    existing = db.query(RiskPredictions).filter(
-                        RiskPredictions.district == district,
-                        RiskPredictions.year     == year,
-                        RiskPredictions.scenario == scenario,
-                        RiskPredictions.crop     == crop,
-                    ).first()
-
-                    if existing:
-                        existing.risk_tier = tier
-                        existing.csi_score = csi_score
-                    else:
-                        db.add(RiskPredictions(
-                            district  = district,
-                            year      = year,
-                            scenario  = scenario,
-                            crop      = crop,
-                            csi_score = csi_score,
-                            risk_tier = tier,
-                        ))
+                    db.add(RiskPredictions(
+                        district  = district,
+                        year      = year,
+                        scenario  = scenario,
+                        crop      = crop,
+                        csi_score = csi_score,
+                        risk_tier = tier,
+                    ))
                     saved += 1
 
                 # Commit per district to avoid one giant transaction

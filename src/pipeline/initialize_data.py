@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, date, timedelta
 from sqlalchemy import insert
-from src.database.db import init_db, SessionLocal, DailyClimate, YieldHistory
+from src.database.db import init_db, SessionLocal, DailyClimate, YieldHistory, log_api_status
 from src.pipeline.pmfby_validation import sync_yield_history
 from src.features.dynamic_baselines import calculate_district_baselines
 from src.features.phenology_clipper import SUPPORTED_CROPS
@@ -70,32 +70,51 @@ def fetch_and_prepare_district(district, start_date, end_date):
         return []
 
 
-def generate_bulk_climate_data():
+def generate_bulk_climate_data(incremental=True, safety_days=15):
     """
-    Fetches and stores daily climate records for all 52 MP districts from
-    2018-01-01 to the current date.
-
-    Uses ThreadPoolExecutor for concurrent fetching to speed up the process.
+    Fetches and stores daily climate records for all 52 MP districts.
+    If incremental=True, it finds the maximum date in DailyClimate,
+    subtracts safety_days to find the start_date, and fetches from there to today.
+    Existing records in that window are deleted first to avoid duplicates.
     """
     db = SessionLocal()
 
-    existing_count = db.query(DailyClimate).count()
-    if existing_count > 0:
-        print(f"ℹ️  daily_climate already has {existing_count:,} records. "
-              f"Skipping bulk sync.  (Delete the DB or truncate the table to re-run.)")
-        db.close()
-        return
+    start_date = TRAINING_START
+    if incremental:
+        from sqlalchemy import func
+        max_date = db.query(func.max(DailyClimate.date)).scalar()
+        if max_date is not None:
+            start_dt = max_date - timedelta(days=safety_days)
+            ts_dt = datetime.strptime(TRAINING_START, "%Y-%m-%d").date()
+            if start_dt < ts_dt:
+                start_dt = ts_dt
+            start_date = start_dt.strftime("%Y-%m-%d")
 
-    print(f"📡 Ingesting climate data for all {len(MP_DISTRICTS)} MP districts concurrently "
-          f"({TRAINING_START} → {TRAINING_END})...")
-    print(f"   Sources: DiCRA API (LST/SM/NDVI) + NASA POWER (precipitation)\n")
+    end_date = datetime.today().strftime("%Y-%m-%d")
+
+    print(f"🔄 Syncing climate data from {start_date} to {end_date} (incremental={incremental}, safety_days={safety_days})...")
+
+    # Delete existing records in the window before writing to prevent duplicate keys
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    del_count = db.query(DailyClimate).filter(
+        DailyClimate.date >= start_dt,
+        DailyClimate.date <= end_dt
+    ).delete()
+    db.commit()
+    print(f"🗑️ Deleted {del_count:,} existing climate records in overlap window [{start_date} to {end_date}].")
+
+    print(f"📡 Ingesting climate data for all {len(MP_DISTRICTS)} MP districts concurrently...")
 
     import concurrent.futures
     all_records = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # Use more workers if incremental since we have a smaller date window
+    max_workers = 10 if incremental else 5
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_dist = {
-            executor.submit(fetch_and_prepare_district, dist, TRAINING_START, TRAINING_END): dist
+            executor.submit(fetch_and_prepare_district, dist, start_date, end_date): dist
             for dist in MP_DISTRICTS
         }
         for future in concurrent.futures.as_completed(future_to_dist):
@@ -111,48 +130,83 @@ def generate_bulk_climate_data():
         db.execute(insert(DailyClimate), all_records)
         db.commit()
         print("✅ daily_climate table populated successfully.")
+        msg = f"Synced {len(all_records):,} daily records across {len(MP_DISTRICTS)} districts for window [{start_date} to {end_date}]."
+        log_api_status(db, "Climate Ingestion", None, "SUCCESS", msg)
     else:
-        print("⚠️  No climate records were prepared — check API connectivity.")
+        print("⚠️ No climate records were prepared — check API connectivity.")
+        log_api_status(db, "Climate Ingestion", None, "FAILED", "No climate records prepared from APIs.")
 
     db.close()
+    return start_date, end_date
+
+
+import threading
+pipeline_lock = threading.Lock()
+
+
+def run_pipeline(incremental=True, safety_days=15):
+    """
+    Thread-safe orchestrator to run the entire CSI-DiCRA pipeline.
+    Returns True if completed successfully, False otherwise.
+    """
+    if not pipeline_lock.acquire(blocking=False):
+        print("⚠️ Pipeline run is already in progress. Skipping execution.")
+        db = SessionLocal()
+        try:
+            log_api_status(db, "Pipeline Scheduler", None, "FAILED", "Skipped run: another sync is currently running.")
+        finally:
+            db.close()
+        return False
+
+    db = SessionLocal()
+    try:
+        log_api_status(db, "Pipeline Scheduler", None, "IN_PROGRESS", f"Pipeline run started (incremental={incremental}, safety_days={safety_days}).")
+        db.commit()
+
+        # 1. Initialise DB schema
+        init_db()
+
+        # 2. Sync PMFBY yield history
+        print("\n[Step 2] 🌾 Syncing yield history...")
+        sync_yield_history()
+
+        # 3. Bulk-ingest daily climate (DiCRA + NASA POWER)
+        print("\n[Step 3] 📡 Fetching climate data from DiCRA Live Sync + NASA POWER...")
+        start_date, end_date = generate_bulk_climate_data(incremental=incremental, safety_days=safety_days)
+
+        # 4. Season-aware baseline calculation per (district, crop)
+        print("\n[Step 4] 📊 Calculating season-aware baselines...")
+        calculate_district_baselines(db)
+
+        # 5. Train one XGBoost model per crop
+        print("\n[Step 5] 🚀 Training XGBoost models for all 6 crops...")
+        train_all_models()
+
+        # 6. Generate CMIP6 risk forecasts (2026-2041)
+        print("\n[Step 6] 🔮 Generating CMIP6 CSI forecasts (SSP2_4.5 & SSP5_8.5)...")
+        generate_forecasts()
+
+        msg = f"Pipeline sync complete. Overlap: {start_date} to {end_date}. Models retrained and forecasts regenerated."
+        print(f"\n✅ {msg}")
+        log_api_status(db, "Pipeline Scheduler", None, "SUCCESS", msg)
+        return True
+    except Exception as e:
+        import traceback
+        err_msg = f"Pipeline execution failed: {e}\n{traceback.format_exc()}"
+        print(f"\n❌ {err_msg}")
+        log_api_status(db, "Pipeline Scheduler", None, "FAILED", f"Error: {e}")
+        return False
+    finally:
+        db.close()
+        pipeline_lock.release()
 
 
 def main():
-    print("=" * 65)
-    print("  CSI-DiCRA — Full Pipeline Initialisation")
-    print(f"  Coverage: All 52 MP Districts | {TRAINING_START} → {TRAINING_END}")
-    print("=" * 65)
-
-    # 1. Initialise DB schema
-    init_db()
-
-    # 2. Sync PMFBY yield history (real API or synthetic 52-district dataset)
-    print("\n[Step 2] 🌾 Syncing yield history...")
-    sync_yield_history()
-
-    # 3. Bulk-ingest daily climate (DiCRA + NASA POWER)
-    print("\n[Step 3] 📡 Fetching climate data from DiCRA Live Sync + NASA POWER...")
-    generate_bulk_climate_data()
-
-    # 4. Season-aware baseline calculation per (district, crop)
-    print("\n[Step 4] 📊 Calculating season-aware baselines...")
-    db = SessionLocal()
-    calculate_district_baselines(db)
-    db.close()
-
-    # 5. Train one XGBoost model per crop
-    print("\n[Step 5] 🚀 Training XGBoost models for all 6 crops...")
-    train_all_models()
-
-    # 6. Generate CMIP6 risk forecasts (2026-2041)
-    print("\n[Step 6] 🔮 Generating CMIP6 CSI forecasts (SSP2_4.5 & SSP5_8.5)...")
-    generate_forecasts()
-
-    print("\n" + "=" * 65)
-    print("  ✅  CSI-DiCRA pipeline initialisation complete!")
-    print("     → FastAPI: uvicorn src.main:app --host 0.0.0.0 --port 8000")
-    print("     → Dashboard: streamlit run src/frontend.py --server.port 8501")
-    print("=" * 65)
+    import sys
+    incremental = True
+    if "--full" in sys.argv:
+        incremental = False
+    run_pipeline(incremental=incremental)
 
 
 if __name__ == "__main__":
