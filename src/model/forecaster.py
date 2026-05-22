@@ -153,7 +153,7 @@ def fetch_cmip6_district(
                     "models":     model,
                     "daily":      "temperature_2m_max,precipitation_sum,soil_moisture_0_to_10cm_mean",
                 },
-                timeout=60,
+                timeout=10,
             )
 
             # Rate limit — wait and retry

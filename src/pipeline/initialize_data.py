@@ -151,11 +151,7 @@ def run_pipeline(incremental=True, safety_days=15):
     """
     if not pipeline_lock.acquire(blocking=False):
         print("⚠️ Pipeline run is already in progress. Skipping execution.")
-        db = SessionLocal()
-        try:
-            log_api_status(db, "Pipeline Scheduler", None, "FAILED", "Skipped run: another sync is currently running.")
-        finally:
-            db.close()
+        # Do not log to DB under 'Pipeline Scheduler' to prevent overwriting the active IN_PROGRESS status in the UI.
         return False
 
     db = SessionLocal()

@@ -170,6 +170,117 @@ st.markdown("""
     #MainMenu, footer { visibility: hidden; }
     header { visibility: visible; background: transparent !important; }
     .block-container { padding-top: 24px; }
+
+    /* Mobile and Tablet Responsiveness */
+    @media (max-width: 768px) {
+        div[data-testid="stPlotlyChart"] {
+            height: 400px !important;
+        }
+        .dash-header {
+            padding: 14px 18px !important;
+            margin-bottom: 16px !important;
+        }
+        .dash-title {
+            font-size: 19px !important;
+        }
+        .dash-subtitle {
+            font-size: 11px !important;
+        }
+        .metric-card {
+            padding: 12px 10px !important;
+        }
+        .metric-value {
+            font-size: 20px !important;
+        }
+        .metric-label {
+            font-size: 8.5px !important;
+            letter-spacing: 1px !important;
+        }
+        .risk-banner {
+            padding: 12px 16px !important;
+        }
+        .risk-title {
+            font-size: 14px !important;
+        }
+        .risk-body {
+            font-size: 11.5px !important;
+        }
+        .advisory-box {
+            padding: 14px 16px !important;
+        }
+        .advisory-item {
+            font-size: 11.5px !important;
+            padding: 6px 0 !important;
+        }
+        button[data-baseweb="tab"] {
+            font-size: 11.5px !important;
+            padding: 8px 10px !important;
+        }
+    }
+
+    /* Sidebar toggle buttons (collapsedControl and stBaseButton-headerNoPadding) styling for high visibility and permanent display */
+    button[data-testid="collapsedControl"],
+    button[data-testid="stBaseButton-headerNoPadding"] {
+        background-color: rgba(26, 42, 26, 0.8) !important;
+        border: 1px solid rgba(45, 74, 45, 0.4) !important;
+        border-radius: 8px !important;
+        color: #7aff7a !important;
+        padding: 5px !important;
+        z-index: 999999 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    button[data-testid="collapsedControl"] svg,
+    button[data-testid="stBaseButton-headerNoPadding"] svg {
+        color: #7aff7a !important;
+        fill: #7aff7a !important;
+        opacity: 1 !important;
+    }
+    /* Disable default hover-only hidden state of the expanded sidebar close button */
+    [data-testid="stSidebar"] [data-testid="stBaseButton-headerNoPadding"] {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    /* Glassmorphic Tabs Styling */
+    div[data-baseweb="tab-list"] {
+        gap: 6px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        margin-bottom: 20px !important;
+        background: transparent !important;
+    }
+    button[data-baseweb="tab"] {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 13.5px !important;
+        font-weight: 600 !important;
+        color: #8b949e !important;
+        background: rgba(22, 27, 34, 0.35) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-bottom: none !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 10px 18px !important;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    button[data-baseweb="tab"]:hover {
+        color: #ffffff !important;
+        background: rgba(22, 27, 34, 0.65) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #7aff7a !important;
+        background: rgba(45, 74, 45, 0.2) !important;
+        border-color: rgba(74, 117, 74, 0.4) !important;
+        border-bottom: 2px solid #7aff7a !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 -4px 12px rgba(74, 117, 74, 0.15) !important;
+    }
+    /* Hide the default purple underline highlight from baseweb */
+    div[data-baseweb="tab-highlight"] {
+        background-color: transparent !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -540,9 +651,33 @@ CROP_TIER_CONFIG = {
         },
     },
 }
-# Initialize session state for selected district
+# Initialize session state for selected district and applied filters
 if "selected_district" not in st.session_state:
     st.session_state["selected_district"] = "Bhopal"
+if "applied_crop" not in st.session_state:
+    st.session_state["applied_crop"] = "Soybean"
+if "applied_year" not in st.session_state:
+    st.session_state["applied_year"] = 2026
+if "applied_scenario" not in st.session_state:
+    st.session_state["applied_scenario"] = "SSP2_4.5"
+
+# Sync temporary filters from applied/session state if not set
+if "temp_district_select" not in st.session_state:
+    st.session_state["temp_district_select"] = st.session_state["selected_district"]
+if "temp_crop_select" not in st.session_state:
+    st.session_state["temp_crop_select"] = st.session_state["applied_crop"]
+if "temp_year_slider" not in st.session_state:
+    st.session_state["temp_year_slider"] = st.session_state["applied_year"]
+if "temp_scenario_radio" not in st.session_state:
+    st.session_state["temp_scenario_radio"] = "SSP2-4.5 — Moderate Action" if st.session_state["applied_scenario"] == "SSP2_4.5" else "SSP5-8.5 — Worst Case"
+
+# Derived local variables for data queries and UI components
+district = st.session_state["selected_district"]
+crop = st.session_state["applied_crop"]
+year = st.session_state["applied_year"]
+scenario_param = st.session_state["applied_scenario"]
+scenario_display = "SSP2-4.5" if scenario_param == "SSP2_4.5" else "SSP5-8.5"
+crop_meta = CROP_DISPLAY[crop]
 
 # ── GeoJSON & API Fetching with Caching ─────────────────────────────────────────
 @st.cache_data
@@ -621,43 +756,52 @@ with st.sidebar:
         "Ujjain", "Umaria", "Vidisha"
     ]
     
-    current_dist = st.session_state["selected_district"]
-    if current_dist not in mp_districts:
-        current_dist = "Bhopal"
-    dist_idx = mp_districts.index(current_dist)
-    
-    def on_district_change():
-        st.session_state["selected_district"] = st.session_state["district_select"]
-        
-    district = st.selectbox(
+    st.selectbox(
         "District", 
         mp_districts, 
-        index=dist_idx,
         label_visibility="collapsed",
-        key="district_select",
-        on_change=on_district_change
+        key="temp_district_select"
     )
 
     st.markdown("<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>Crop</div>", unsafe_allow_html=True)
-    crop = st.selectbox(
+    crop_options = list(CROP_DISPLAY.keys())
+
+    st.selectbox(
         "Crop",
-        list(CROP_DISPLAY.keys()),
+        crop_options,
         label_visibility="collapsed",
-        key="crop_select",
+        key="temp_crop_select",
     )
-    crop_meta = CROP_DISPLAY[crop]
 
     st.markdown("<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>Season Year</div>", unsafe_allow_html=True)
-    year = st.slider("Season Year", min_value=2026, max_value=2041, value=2026, label_visibility="collapsed")
+    st.slider(
+        "Season Year", 
+        min_value=2026, 
+        max_value=2041, 
+        label_visibility="collapsed",
+        key="temp_year_slider"
+    )
 
     st.markdown("<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>Climate Scenario</div>", unsafe_allow_html=True)
-    scenario_label = st.radio(
+    scenario_options = ["SSP2-4.5 — Moderate Action", "SSP5-8.5 — Worst Case"]
+
+    st.radio(
         "Climate Scenario",
-        ["SSP2-4.5 — Moderate Action", "SSP5-8.5 — Worst Case"],
-        label_visibility="collapsed"
+        scenario_options,
+        label_visibility="collapsed",
+        key="temp_scenario_radio"
     )
-    scenario_param   = "SSP2_4.5" if "SSP2" in scenario_label else "SSP5_8.5"
-    scenario_display = "SSP2-4.5" if "SSP2" in scenario_label else "SSP5-8.5"
+
+    st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+    search_clicked = st.button("Search 🔍", use_container_width=True, type="primary")
+    if search_clicked:
+        st.session_state["selected_district"] = st.session_state["temp_district_select"]
+        st.session_state["applied_crop"] = st.session_state["temp_crop_select"]
+        st.session_state["applied_year"] = st.session_state["temp_year_slider"]
+        st.session_state["applied_scenario"] = "SSP2_4.5" if "SSP2" in st.session_state["temp_scenario_radio"] else "SSP5_8.5"
+        st.rerun()
+
+    temp_scenario_display = "SSP2-4.5" if "SSP2" in st.session_state["temp_scenario_radio"] else "SSP5-8.5"
 
     st.markdown("""
     <div style='margin-top:32px;padding:12px;background:rgba(22, 27, 34, 0.5);border:1px solid rgba(255,255,255,0.08);border-radius:8px;'>
@@ -670,53 +814,8 @@ with st.sidebar:
             🌱 FAO Crop Calendars
         </div>
     </div>
-    """.format(scenario=scenario_display), unsafe_allow_html=True)
+    """.format(scenario=temp_scenario_display), unsafe_allow_html=True)
 
-    # ── System Diagnostics ──────────────────────────────────────────────────────────
-    st.markdown("<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:28px 0 6px;'>System Status</div>", unsafe_allow_html=True)
-
-    last_sync_time = "Never"
-    last_sync_status = "N/A"
-    last_sync_msg = "No sync logged yet."
-
-    try:
-        status_resp = requests.get(f"{API_URL}/health/api_status", headers=HEADERS, timeout=2)
-        if status_resp.status_code == 200:
-            logs = status_resp.json()
-            scheduler_logs = [log for log in logs if log.get("service") == "Pipeline Scheduler"]
-            if scheduler_logs:
-                latest = scheduler_logs[0]
-                last_sync_time = latest.get("timestamp", "N/A")
-                last_sync_status = latest.get("status", "N/A")
-                last_sync_msg = latest.get("message", "No message details.")
-    except Exception as e:
-        last_sync_msg = f"Cannot fetch status: {e}"
-
-    status_color = "#3fb950" if last_sync_status == "SUCCESS" else ("#f85149" if last_sync_status == "FAILED" else "#8b949e")
-
-    st.markdown(f"""
-    <div style='padding:12px;background:rgba(22, 27, 34, 0.5);border:1px solid rgba(255,255,255,0.08);border-radius:8px;'>
-        <div style='font-size:11px;color:#8b949e;'>
-            <b style='color:#c9d1d9;'>Live Climate Sync</b><br><br>
-            📅 Last Run: <span style='color:#c9d1d9;'>{last_sync_time}</span><br>
-            🚦 Status: <span style='color:{status_color};font-weight:bold;'>{last_sync_status}</span><br>
-            📝 Log: <span style='color:#8b949e;font-style:italic;'>{last_sync_msg}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-
-    if st.button("Sync Now 🔄", key="sync_now_btn", use_container_width=True):
-        try:
-            sync_resp = requests.post(f"{API_URL}/pipeline/sync?incremental=true&safety_days=15", headers=HEADERS, timeout=2)
-            if sync_resp.status_code == 200:
-                st.success("🔄 Climate sync triggered in background!")
-                st.info("Wait ~5-10 seconds and reload the page to see updated CSI results.")
-            else:
-                st.error(f"Failed to trigger sync: HTTP {sync_resp.status_code}")
-        except Exception as e:
-            st.error(f"Error triggering sync: {e}")
 
 # ── Header ──────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -742,9 +841,15 @@ if not map_data:
     st.stop()
 
 # ── Layout ──────────────────────────────────────────────────────────────────────
-col_map, col_details = st.columns([1.3, 1.0], gap="large")
+# Define the tabs below the CSI header
+tab_map, tab_details, tab_actions, tab_trajectory = st.tabs([
+    "🗺️ Interactive Map",
+    "📊 Selected District Details",
+    "🌾 Recommended Actions",
+    "📈 15-Year Risk Trajectory"
+])
 
-with col_map:
+with tab_map:
     st.markdown("<div class='section-label'>Interactive District Map</div>", unsafe_allow_html=True)
     
     # Layer selector control
@@ -920,9 +1025,10 @@ with col_map:
         if clicked_district and clicked_district in mp_districts:
             if clicked_district != st.session_state["selected_district"]:
                 st.session_state["selected_district"] = clicked_district
+                st.session_state["temp_district_select"] = clicked_district
                 st.rerun()
 
-with col_details:
+with tab_details:
     st.markdown("<div class='section-label'>Selected District Details</div>", unsafe_allow_html=True)
     
     # Load selected district stats
@@ -937,8 +1043,8 @@ with col_details:
     
     cfg = CROP_TIER_CONFIG[crop][tier]
     
-    # 2x3 Grid of Metrics
-    mc1, mc2 = st.columns(2)
+    # 3-Column Grid of Metrics
+    mc1, mc2, mc3 = st.columns(3, gap="medium")
     with mc1:
         st.markdown(f"""
         <div class="metric-card">
@@ -950,6 +1056,14 @@ with col_details:
         
         st.markdown(f"""
         <div class="metric-card">
+            <div class="metric-label">CSI Score</div>
+            <div class="metric-value">{csi_score:.2f}</div>
+            <div class="metric-sub">0.0 = Min · 1.0 = Max</div>
+        </div>""", unsafe_allow_html=True)
+        
+    with mc2:
+        st.markdown(f"""
+        <div class="metric-card">
             <div class="metric-label">Soil Moisture</div>
             <div class="metric-value" style="color:#7fb5ff;">{sm_val:.3f}</div>
             <div class="metric-sub">Window Avg m³/m³</div>
@@ -958,25 +1072,17 @@ with col_details:
         
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">NDVI</div>
-            <div class="metric-value" style="color:#5cdb95;">{ndvi_val:.3f}</div>
-            <div class="metric-sub">Vegetation Index</div>
-        </div>""", unsafe_allow_html=True)
-        
-    with mc2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">CSI Score</div>
-            <div class="metric-value">{csi_score:.2f}</div>
-            <div class="metric-sub">0.0 = Min · 1.0 = Max</div>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="metric-card">
             <div class="metric-label">SPI-3 Index</div>
             <div class="metric-value" style="color:#a8cc3a;">{spi3_val:.2f}</div>
             <div class="metric-sub">Drought Metric</div>
+        </div>""", unsafe_allow_html=True)
+        
+    with mc3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">NDVI</div>
+            <div class="metric-value" style="color:#5cdb95;">{ndvi_val:.3f}</div>
+            <div class="metric-sub">Vegetation Index</div>
         </div>""", unsafe_allow_html=True)
         st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
         
@@ -998,8 +1104,13 @@ with col_details:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
-
+with tab_actions:
+    st.markdown("<div class='section-label'>Risk Assessment & Advisories</div>", unsafe_allow_html=True)
+    
+    dist_stats = map_data.get(st.session_state["selected_district"], {})
+    tier = dist_stats.get("CSI Risk Tier", 1)
+    cfg = CROP_TIER_CONFIG[crop][tier]
+    
     # Risk Assessment Banner
     st.markdown(f"""
     <div class="risk-banner {cfg['css']}">
@@ -1016,8 +1127,9 @@ with col_details:
         for a in cfg["actions"]:
             st.markdown(f"<div class='advisory-item'><span>{a}</span></div>", unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
-
+with tab_trajectory:
+    st.markdown("<div class='section-label'>15-Year Risk Trajectory</div>", unsafe_allow_html=True)
+    
     # 15-Year Trajectory Panel
     with st.container(border=True):
         st.markdown("<div class='advisory-heading'>📈 15-Year Risk Trajectory (2026 – 2041)</div>", unsafe_allow_html=True)
@@ -1066,7 +1178,7 @@ with col_details:
                 ),
                 margin=dict(l=10, r=10, t=10, b=10),
                 showlegend=False,
-                height=200,
+                height=220,
                 bargap=0.25,
             )
             for t_val, t_color in tier_colors.items():

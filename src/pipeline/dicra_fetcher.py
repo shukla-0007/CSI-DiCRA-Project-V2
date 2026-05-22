@@ -125,7 +125,7 @@ def _dicra_post(lat: float, lon: float, start_date: str, end_date: str, layer_id
         resp = requests.post(
             DICRA_ENDPOINT,
             json=payload,
-            timeout=60,
+            timeout=5,
             headers={"Content-Type": "application/json"},
         )
         if resp.status_code != 200:
@@ -244,7 +244,7 @@ def _nasa_power_fetch(lat: float, lon: float, start_date: str, end_date: str):
         "format":     "JSON",
     }
     try:
-        resp = requests.get(NASA_POWER_URL, params=params, timeout=60)
+        resp = requests.get(NASA_POWER_URL, params=params, timeout=10)
         if resp.status_code == 200:
             param_data = resp.json()["properties"]["parameter"]
             tmax_dict  = param_data.get("T2M_MAX", {})
