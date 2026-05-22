@@ -280,6 +280,22 @@ def get_map_data(
                 else "Base Rate"
             )
 
+            # Calculate SHAP explainability
+            from src.model.explainability import get_shap_explanation
+            baseline_rec = baseline_map.get(district)
+            tmax_95th = baseline_rec.tmax_95th if baseline_rec else 35.0
+            sm_5th = baseline_rec.sm_5th if baseline_rec else 0.08
+            
+            feat_arr = np.array([[
+                float(mean_tmax),
+                float(mean_sm),
+                float(ndvi_approx),
+                float(window_spi3) if pd.notna(window_spi3) else 0.0,
+                float(mean_tmax - tmax_95th),
+                float(mean_sm - sm_5th)
+            ]])
+            shap_result = get_shap_explanation(crop, feat_arr)
+
             # Round output variables
             results[district] = {
                 "NDVI": round(float(ndvi_approx), 3),
@@ -288,7 +304,8 @@ def get_map_data(
                 "SPI-3": round(float(window_spi3), 3) if pd.notna(window_spi3) else 0.0,
                 "CSI Risk Tier": int(tier),
                 "CSI Score": round(float(score), 3),
-                "Recommended Premium Adjustment": recommended_premium
+                "Recommended Premium Adjustment": recommended_premium,
+                "explainability": shap_result
             }
         except Exception as e:
             # Log error and skip district

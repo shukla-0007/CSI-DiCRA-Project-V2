@@ -1104,6 +1104,64 @@ with tab_details:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── SHAP Explainability Plot ──────────────────────────────────────────────────
+    explainability = dist_stats.get("explainability", {})
+    contributions = explainability.get("contributions", {})
+    base_value = explainability.get("base_value", 0.0)
+    
+    if contributions:
+        import plotly.graph_objects as go
+        
+        # Sort contributions for a clean top-to-bottom or bottom-to-top order
+        sorted_contribs = sorted(contributions.items(), key=lambda x: x[1])
+        features_list = [x[0] for x in sorted_contribs]
+        values_list = [x[1] for x in sorted_contribs]
+        
+        # Colors: Green for yield-increasing factors, Red for yield-decreasing factors
+        colors = ["rgba(239, 83, 80, 0.75)" if v < 0 else "rgba(38, 166, 154, 0.75)" for v in values_list]
+        borders = ["#ef5350" if v < 0 else "#26a69a" for v in values_list]
+        
+        fig_shap = go.Figure()
+        fig_shap.add_trace(go.Bar(
+            y=features_list,
+            x=values_list,
+            orientation='h',
+            marker=dict(
+                color=colors,
+                line=dict(color=borders, width=1.2)
+            ),
+            hovertemplate="Factor: %{y}<br>Impact: %{x:+,d} kg/ha<extra></extra>"
+        ))
+        
+        fig_shap.update_layout(
+            title=dict(
+                text=f"🔍 Actuarial Explainability: Yield Deficit/Surplus (Base: {base_value:,.0f} kg/ha)",
+                font=dict(color="#e4e6eb", size=13),
+                x=0.0,
+                y=0.98
+            ),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(
+                title="Yield Deviation Contribution (kg/ha)",
+                titlefont=dict(color="#8b949e", size=10),
+                tickfont=dict(color="#8b949e", size=9),
+                gridcolor="rgba(255,255,255,0.08)",
+                zerolinecolor="rgba(255,255,255,0.2)"
+            ),
+            yaxis=dict(
+                tickfont=dict(color="#c9d1d9", size=11),
+                gridcolor="rgba(255,255,255,0.0)"
+            ),
+            margin=dict(l=10, r=10, t=35, b=10),
+            height=260,
+        )
+        
+        st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.plotly_chart(fig_shap, use_container_width=True)
+
+
 with tab_actions:
     st.markdown("<div class='section-label'>Risk Assessment & Advisories</div>", unsafe_allow_html=True)
     
