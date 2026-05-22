@@ -51,10 +51,13 @@ def parse_and_process_netcdf(
         lat, lon = get_district_coordinates(dist)
         district_centroids[dist] = (lat, lon)
 
-    # Scenarios mapping: CORDEX uses lowercase standard (ssp245), main app uses uppercase SSP2_4.5
+    # Scenarios mapping: CORDEX uses lowercase standard (ssp245) or CMIP5 RCP counterpart (rcp45)
+    # The main app expects files with "SSP2_4.5" and "SSP5_8.5" scenarios
     scenario_map = {
         "ssp245": "SSP2_4.5",
-        "ssp585": "SSP5_8.5"
+        "ssp585": "SSP5_8.5",
+        "rcp45": "SSP2_4.5",
+        "rcp85": "SSP5_8.5"
     }
 
     # Group files by scenario and variable for unified extraction
