@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.graph_objects as go
-
+import numpy as np
+import json
+import copy
 import os
 
 # ── Config ─────────────────────────────────────────────────────────────────────
@@ -42,79 +44,100 @@ st.markdown("""
 
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    .main { background-color: #0f1117; }
+    .main { background-color: #0c0f14; }
 
-    /* Header */
+    /* Header with Glassmorphism */
     .dash-header {
-        background: linear-gradient(135deg, #1a2a1a 0%, #0d1f0d 100%);
-        border: 1px solid #2d4a2d;
+        background: linear-gradient(135deg, rgba(26, 42, 26, 0.45) 0%, rgba(13, 31, 13, 0.45) 100%);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(45, 74, 45, 0.3);
         border-radius: 16px;
-        padding: 24px 32px;
+        padding: 20px 28px;
         margin-bottom: 24px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
     }
     .dash-title {
-        font-size: 28px; font-weight: 700;
+        font-size: 26px; font-weight: 700;
         color: #ffffff; margin: 0; letter-spacing: -0.5px;
     }
     .dash-subtitle {
-        font-size: 13px; color: #7aab7a; margin-top: 4px; font-weight: 400;
+        font-size: 13px; color: #82b082; margin-top: 4px; font-weight: 400;
     }
     .badge {
         display: inline-block;
-        background: #2d4a2d; color: #7aff7a;
+        background: rgba(45, 74, 45, 0.6); color: #7aff7a;
         font-size: 11px; font-weight: 600; letter-spacing: 1px;
         padding: 3px 10px; border-radius: 20px;
         margin-left: 10px; vertical-align: middle;
+        border: 1px solid rgba(74, 117, 74, 0.3);
     }
 
-    /* Metric Cards */
+    /* Metric Cards with Glassmorphism */
     .metric-card {
-        background: #161b22;
-        border: 1px solid #21262d;
+        background: rgba(22, 27, 34, 0.55);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 12px;
-        padding: 20px 24px;
+        padding: 16px 18px;
         text-align: center;
+        box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.2);
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .metric-card:hover {
+        border-color: rgba(255, 255, 255, 0.18);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.35);
+        background: rgba(22, 27, 34, 0.7);
     }
     .metric-label {
-        font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
-        text-transform: uppercase; color: #8b949e; margin-bottom: 8px;
+        font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+        text-transform: uppercase; color: #8b949e; margin-bottom: 6px;
     }
     .metric-value {
-        font-size: 36px; font-weight: 700; color: #ffffff; line-height: 1;
+        font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.1;
     }
-    .metric-sub { font-size: 12px; color: #8b949e; margin-top: 6px; }
+    .metric-sub { font-size: 11px; color: #8b949e; margin-top: 6px; }
 
-    /* Risk Banner */
+    /* Risk Banner with Glassmorphism */
     .risk-banner {
         border-radius: 12px;
-        padding: 20px 28px;
+        padding: 18px 24px;
         margin: 8px 0;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         border-left: 5px solid;
+        box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2);
     }
-    .risk-1 { background: #0d2b0d; border-color: #3fb950; color: #3fb950; }
-    .risk-2 { background: #1e2a0d; border-color: #a8cc3a; color: #a8cc3a; }
-    .risk-3 { background: #2a1e0d; border-color: #d29922; color: #d29922; }
-    .risk-4 { background: #2a110d; border-color: #f85149; color: #f85149; }
-    .risk-5 { background: #2a0d0d; border-color: #ff0000; color: #ff6b6b; }
+    .risk-1 { background: rgba(13, 43, 13, 0.45); border-color: #3fb950; color: #a2fda2; }
+    .risk-2 { background: rgba(30, 42, 13, 0.45); border-color: #a8cc3a; color: #e1fda2; }
+    .risk-3 { background: rgba(42, 30, 13, 0.45); border-color: #d29922; color: #fde8a2; }
+    .risk-4 { background: rgba(42, 17, 13, 0.45); border-color: #f85149; color: #fda2a2; }
+    .risk-5 { background: rgba(42, 13, 13, 0.45); border-color: #ff0000; color: #ffbcbc; }
 
-    .risk-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-    .risk-body  { font-size: 14px; opacity: 0.85; line-height: 1.6; }
+    .risk-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .risk-body  { font-size: 13.5px; opacity: 0.9; line-height: 1.5; }
 
-    /* Advisory Box */
+    /* Advisory Box with Glassmorphism */
     .advisory-box {
-        background: #161b22;
-        border: 1px solid #21262d;
+        background: rgba(22, 27, 34, 0.55);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 12px;
         padding: 20px 24px;
         margin-top: 8px;
+        box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.2);
     }
     .advisory-heading {
-        font-size: 13px; font-weight: 600; letter-spacing: 1px;
+        font-size: 12px; font-weight: 600; letter-spacing: 1px;
         color: #8b949e; text-transform: uppercase; margin-bottom: 12px;
     }
     .advisory-item {
-        font-size: 14px; color: #c9d1d9;
-        padding: 6px 0; border-bottom: 1px solid #21262d;
+        font-size: 13.5px; color: #c9d1d9;
+        padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         display: flex; align-items: flex-start; gap: 10px;
     }
     .advisory-item:last-child { border-bottom: none; }
@@ -123,13 +146,25 @@ st.markdown("""
     .section-label {
         font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
         text-transform: uppercase; color: #8b949e;
-        margin: 28px 0 12px;
+        margin: 24px 0 12px;
     }
 
     /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #0d1117; border-right: 1px solid #21262d; }
+    [data-testid="stSidebar"] { background-color: #0b0d12; border-right: 1px solid rgba(255, 255, 255, 0.07); }
     [data-testid="stSidebar"] .stSelectbox label,
     [data-testid="stSidebar"] .stSlider label { color: #8b949e !important; font-size: 12px !important; }
+
+    /* Style Streamlit containers with borders as glassmorphic cards */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: rgba(22, 27, 34, 0.45) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25) !important;
+        margin-bottom: 15px !important;
+    }
 
     /* Hide default Streamlit chrome but keep sidebar toggle */
     #MainMenu, footer { visibility: hidden; }
@@ -505,11 +540,71 @@ CROP_TIER_CONFIG = {
         },
     },
 }
+# Initialize session state for selected district
+if "selected_district" not in st.session_state:
+    st.session_state["selected_district"] = "Bhopal"
+
+# ── GeoJSON & API Fetching with Caching ─────────────────────────────────────────
+@st.cache_data
+def load_geojson():
+    with open("data/mp_boundaries.json", "r") as f:
+        geojson = json.load(f)
+    rename_map = {
+        "AgarMalwa": "Agar Malwa",
+        "EastNimar": "Khandwa",
+        "WestNimar": "Khargone",
+        "Narsimhapur": "Narsinghpur"
+    }
+    tikamgarh_feature = None
+    for feature in geojson["features"]:
+        name = feature["properties"]["district_name"]
+        if name in rename_map:
+            feature["properties"]["district_name"] = rename_map[name]
+        if name == "Tikamgarh":
+            tikamgarh_feature = feature
+            
+    # Add Niwari by duplicating Tikamgarh if not present
+    has_niwari = any(f["properties"]["district_name"] == "Niwari" for f in geojson["features"])
+    if not has_niwari and tikamgarh_feature:
+        niwari_feature = copy.deepcopy(tikamgarh_feature)
+        niwari_feature["properties"]["district_name"] = "Niwari"
+        geojson["features"].append(niwari_feature)
+    return geojson
+
+@st.cache_data(ttl=300)
+def fetch_bulk_map_data(crop: str, year: int, scenario: str):
+    try:
+        resp = requests.get(
+            f"{API_URL}/dashboard/map_data",
+            params={"crop": crop, "year": year, "scenario": scenario},
+            headers=HEADERS,
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        st.error(f"Error fetching map data: {e}")
+    return {}
+
+@st.cache_data(ttl=300)
+def fetch_trajectory_data(district: str, crop: str, scenario: str):
+    try:
+        resp = requests.get(
+            f"{API_URL}/dashboard/trajectory",
+            params={"district": district, "crop": crop, "scenario": scenario},
+            headers=HEADERS,
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return pd.DataFrame(resp.json())
+    except Exception:
+        pass
+    return pd.DataFrame()
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style='padding: 16px 0 8px; border-bottom: 1px solid #21262d; margin-bottom: 20px;'>
+    <div style='padding: 16px 0 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 20px;'>
         <div style='font-size:18px; font-weight:700; color:#ffffff;'>🌾 CSI-DiCRA</div>
         <div style='font-size:11px; color:#7aab7a; margin-top:2px;'>Farmer Advisory Dashboard</div>
     </div>
@@ -525,7 +620,23 @@ with st.sidebar:
         "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri", "Sidhi", "Singrauli", "Tikamgarh",
         "Ujjain", "Umaria", "Vidisha"
     ]
-    district = st.selectbox("District", mp_districts, label_visibility="collapsed")
+    
+    current_dist = st.session_state["selected_district"]
+    if current_dist not in mp_districts:
+        current_dist = "Bhopal"
+    dist_idx = mp_districts.index(current_dist)
+    
+    def on_district_change():
+        st.session_state["selected_district"] = st.session_state["district_select"]
+        
+    district = st.selectbox(
+        "District", 
+        mp_districts, 
+        index=dist_idx,
+        label_visibility="collapsed",
+        key="district_select",
+        on_change=on_district_change
+    )
 
     st.markdown("<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>Crop</div>", unsafe_allow_html=True)
     crop = st.selectbox(
@@ -549,7 +660,7 @@ with st.sidebar:
     scenario_display = "SSP2-4.5" if "SSP2" in scenario_label else "SSP5-8.5"
 
     st.markdown("""
-    <div style='margin-top:32px;padding:12px;background:#161b22;border:1px solid #21262d;border-radius:8px;'>
+    <div style='margin-top:32px;padding:12px;background:rgba(22, 27, 34, 0.5);border:1px solid rgba(255,255,255,0.08);border-radius:8px;'>
         <div style='font-size:11px;color:#8b949e;'>
             <b style='color:#c9d1d9;'>Data Sources</b><br><br>
             🛰️ DiCRA API (Tmax, NDVI, SM)<br>
@@ -584,7 +695,7 @@ with st.sidebar:
     status_color = "#3fb950" if last_sync_status == "SUCCESS" else ("#f85149" if last_sync_status == "FAILED" else "#8b949e")
 
     st.markdown(f"""
-    <div style='padding:12px;background:#161b22;border:1px solid #21262d;border-radius:8px;'>
+    <div style='padding:12px;background:rgba(22, 27, 34, 0.5);border:1px solid rgba(255,255,255,0.08);border-radius:8px;'>
         <div style='font-size:11px;color:#8b949e;'>
             <b style='color:#c9d1d9;'>Live Climate Sync</b><br><br>
             📅 Last Run: <span style='color:#c9d1d9;'>{last_sync_time}</span><br>
@@ -616,177 +727,363 @@ st.markdown(f"""
     </div>
     <div class="dash-subtitle">
         Data in Climate Resilient Agriculture &nbsp;·&nbsp; District Advisory &nbsp;·&nbsp;
-        {district} &nbsp;·&nbsp; {crop_meta['emoji']} {crop} &nbsp;·&nbsp;
+        {st.session_state["selected_district"]} &nbsp;·&nbsp; {crop_meta['emoji']} {crop} &nbsp;·&nbsp;
         {crop_meta['season']} {year} &nbsp;·&nbsp; {scenario_display}
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── Fetch current year data ─────────────────────────────────────────────────────
-tier, csi_score, premium_adj = None, None, None
-try:
-    resp = requests.get(
-        f"{API_URL}/insurance/premium_risk",
-        params={"district": district, "year": year, "crop": crop, "scenario": scenario_param},
-        headers=HEADERS,
-        timeout=5,
-    )
-    if resp.status_code == 200:
-        d            = resp.json()
-        tier         = d["csi_risk_tier"]
-        csi_score    = d["probabilistic_score"]
-        premium_adj  = d["recommended_premium_adjustment"]
-except Exception:
-    pass
+# Fetch bulk map data
+map_data = fetch_bulk_map_data(crop, year, scenario_param)
 
-# ── Fetch trajectory data ───────────────────────────────────────────────────────
-trajectory_df = pd.DataFrame()
-try:
-    resp2 = requests.get(
-        f"{API_URL}/dashboard/trajectory",
-        params={"district": district, "crop": crop, "scenario": scenario_param},
-        headers=HEADERS,
-        timeout=5,
-    )
-    if resp2.status_code == 200:
-        trajectory_df = pd.DataFrame(resp2.json())
-except Exception:
-    pass
-
-# ── Main content ────────────────────────────────────────────────────────────────
-if tier is None:
-    st.error("⚠️ Cannot connect to the FastAPI backend. Ensure it is running on port 8000.")
+if not map_data:
+    st.error("⚠️ Cannot connect to the FastAPI backend or load map data. Ensure it is running on port 8000.")
     st.code("cd CSI-DiCRA-Project && PYTHONPATH=. python -m uvicorn src.main:app --reload --port 8000")
     st.stop()
 
-cfg = CROP_TIER_CONFIG[crop][tier]
+# ── Layout ──────────────────────────────────────────────────────────────────────
+col_map, col_details = st.columns([1.3, 1.0], gap="large")
 
-# Row 1 — Metric Cards
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Risk Tier</div>
-        <div class="metric-value" style="color:{cfg['color']};">{tier} / 5</div>
-        <div class="metric-sub">{cfg['emoji']} {cfg['label']}</div>
-    </div>""", unsafe_allow_html=True)
-
-with c2:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">CSI Score</div>
-        <div class="metric-value">{csi_score:.2f}</div>
-        <div class="metric-sub">0.0 = No stress &nbsp;·&nbsp; 1.0 = Max</div>
-    </div>""", unsafe_allow_html=True)
-
-with c3:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Crop · Season</div>
-        <div class="metric-value" style="font-size:22px;padding-top:6px;">{crop_meta['emoji']} {crop}</div>
-        <div class="metric-sub">{crop_meta['season']} &nbsp;·&nbsp; {crop_meta['window']}</div>
-    </div>""", unsafe_allow_html=True)
-
-with c4:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">Insurance Signal</div>
-        <div class="metric-value" style="font-size:22px;padding-top:6px;">{premium_adj}</div>
-        <div class="metric-sub">Actuarial Premium Adjustment</div>
-    </div>""", unsafe_allow_html=True)
-
-# Row 2 — Risk Banner
-st.markdown("<div class='section-label'>Risk Assessment</div>", unsafe_allow_html=True)
-st.markdown(f"""
-<div class="risk-banner {cfg['css']}">
-    <div class="risk-title">{cfg['emoji']} Tier {tier} — {cfg['label']}</div>
-    <div class="risk-body">{cfg['headline']}</div>
-</div>
-""", unsafe_allow_html=True)
-
-# Row 3 — Advisory actions + Trajectory chart
-left, right = st.columns([1, 1.6], gap="large")
-
-with left:
-    st.markdown("<div class='section-label'>Field Advisory</div>", unsafe_allow_html=True)
-    items_html = "".join(
-        f"<div class='advisory-item'><span>{a}</span></div>"
-        for a in cfg["actions"]
+with col_map:
+    st.markdown("<div class='section-label'>Interactive District Map</div>", unsafe_allow_html=True)
+    
+    # Layer selector control
+    selected_layer = st.segmented_control(
+        "Map Layer Select",
+        options=["CSI Risk Tier", "SPI-3", "Soil Moisture", "Tmax", "NDVI"],
+        default="CSI Risk Tier",
+        label_visibility="collapsed",
+        key="map_layer_control"
     )
-    st.markdown(
-        f"<div class='advisory-box'>"
-        f"<div class='advisory-heading'>Recommended Actions — {crop} {year}</div>"
-        f"{items_html}</div>",
-        unsafe_allow_html=True,
-    )
-
-with right:
-    st.markdown("<div class='section-label'>15-Year Risk Trajectory (2026 – 2041)</div>", unsafe_allow_html=True)
-
-    if not trajectory_df.empty:
-        tier_colors = {1: "#3fb950", 2: "#a8cc3a", 3: "#d29922", 4: "#f85149", 5: "#ff6b6b"}
-        bar_colors  = [tier_colors.get(int(t), "#8b949e") for t in trajectory_df["risk_tier"]]
-
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=trajectory_df["year"],
-            y=trajectory_df["risk_tier"],
-            marker_color=bar_colors,
-            marker_line_color="rgba(0,0,0,0)",
-            opacity=0.7,
-            name="Risk Tier",
-            hovertemplate="<b>%{x}</b><br>Risk Tier: %{y}<br><extra></extra>",
+    if not selected_layer:
+        selected_layer = "CSI Risk Tier"
+        
+    geojson = load_geojson()
+    
+    # Build Map DataFrame
+    map_records = []
+    for d_name in mp_districts:
+        d_vals = map_data.get(d_name, {})
+        rec = {
+            "district": d_name,
+            "NDVI": d_vals.get("NDVI", 0.0),
+            "Tmax": d_vals.get("Tmax", 0.0),
+            "Soil Moisture": d_vals.get("Soil Moisture", 0.0),
+            "SPI-3": d_vals.get("SPI-3", 0.0),
+            "CSI Risk Tier": d_vals.get("CSI Risk Tier", 1),
+            "CSI Score": d_vals.get("CSI Score", 0.0),
+            "Recommended Premium Adjustment": d_vals.get("Recommended Premium Adjustment", "Base Rate")
+        }
+        map_records.append(rec)
+        
+    map_df = pd.DataFrame(map_records)
+    
+    # Layer configuration dictionary
+    LAYER_CONFIGS = {
+        "CSI Risk Tier": {
+            "colorscale": [
+                [0.0, "#3fb950"],
+                [0.2, "#3fb950"],
+                [0.2, "#a8cc3a"],
+                [0.4, "#a8cc3a"],
+                [0.4, "#d29922"],
+                [0.6, "#d29922"],
+                [0.6, "#f85149"],
+                [0.8, "#f85149"],
+                [0.8, "#ff6b6b"],
+                [1.0, "#ff6b6b"]
+            ],
+            "zmin": 1,
+            "zmax": 5,
+            "colorbar_title": "Risk Tier",
+        },
+        "SPI-3": {
+            "colorscale": "RdYlBu",
+            "zmin": -2.0,
+            "zmax": 2.0,
+            "colorbar_title": "SPI-3 Index",
+        },
+        "Soil Moisture": {
+            "colorscale": "YlGnBu",
+            "zmin": 0.1,
+            "zmax": 0.5,
+            "colorbar_title": "Soil Moisture",
+        },
+        "Tmax": {
+            "colorscale": "YlOrRd",
+            "zmin": 25.0,
+            "zmax": 40.0,
+            "colorbar_title": "Tmax (°C)",
+        },
+        "NDVI": {
+            "colorscale": "YlGn",
+            "zmin": 0.2,
+            "zmax": 0.8,
+            "colorbar_title": "NDVI",
+        }
+    }
+    
+    l_cfg = LAYER_CONFIGS[selected_layer]
+    
+    # Stack data for custom hovers
+    customdata = np.stack((
+        map_df["NDVI"],
+        map_df["Tmax"],
+        map_df["Soil Moisture"],
+        map_df["SPI-3"],
+        map_df["CSI Risk Tier"],
+        map_df["CSI Score"],
+        map_df["Recommended Premium Adjustment"]
+    ), axis=-1)
+    
+    fig = go.Figure()
+    
+    # Add base choropleth layer
+    fig.add_trace(go.Choroplethmap(
+        geojson=geojson,
+        locations=map_df["district"],
+        z=map_df[selected_layer],
+        featureidkey="properties.district_name",
+        colorscale=l_cfg["colorscale"],
+        zmin=l_cfg["zmin"],
+        zmax=l_cfg["zmax"],
+        marker_opacity=0.6,
+        marker_line_width=0.8,
+        marker_line_color="rgba(255,255,255,0.15)",
+        customdata=customdata,
+        hovertemplate=(
+            "<b>District: %{location}</b><br><br>"
+            "🔴 CSI Risk Tier: <b>%{customdata[4]} / 5</b><br>"
+            "📊 CSI Score: <b>%{customdata[5]:.2f}</b><br>"
+            "🌱 NDVI: <b>%{customdata[0]:.3f}</b><br>"
+            "🌡️ Tmax: <b>%{customdata[1]:.1f}°C</b><br>"
+            "💧 Soil Moisture: <b>%{customdata[2]:.3f}</b><br>"
+            "🌧️ SPI-3: <b>%{customdata[3]:.3f}</b><br>"
+            "💼 Premium: <b>%{customdata[6]}</b><br>"
+            "<extra></extra>"
+        ),
+        colorbar=dict(
+            title=dict(text=l_cfg["colorbar_title"], font=dict(color="#8b949e", size=11)),
+            tickfont=dict(color="#8b949e", size=10),
+            bgcolor="rgba(0,0,0,0)",
+            thickness=12,
+            len=0.6,
+            yanchor="middle",
+            y=0.5,
+            xpad=10
+        )
+    ))
+    
+    # Add highlight layer for selected district
+    selected_dist = st.session_state["selected_district"]
+    selected_df = map_df[map_df["district"] == selected_dist]
+    if not selected_df.empty:
+        fig.add_trace(go.Choroplethmap(
+            geojson=geojson,
+            locations=selected_df["district"],
+            z=selected_df[selected_layer],
+            featureidkey="properties.district_name",
+            colorscale=l_cfg["colorscale"],
+            zmin=l_cfg["zmin"],
+            zmax=l_cfg["zmax"],
+            marker_opacity=0.9,
+            marker_line_width=2.5,
+            marker_line_color="#ffffff",
+            showscale=False,
+            hoverinfo="skip"
         ))
+        
+    fig.update_layout(
+        map=dict(
+            style="carto-darkmatter",
+            center=dict(lat=23.3, lon=78.2),
+            zoom=5.3,
+            uirevision=True
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=620
+    )
+    
+    event = st.plotly_chart(
+        fig, 
+        on_select="rerun", 
+        selection_mode="points", 
+        key="map_plot", 
+        use_container_width=True
+    )
+    
+    # Trigger state update on map click
+    if event and "selection" in event and event["selection"]["points"]:
+        clicked_district = event["selection"]["points"][0].get("location")
+        if clicked_district and clicked_district in mp_districts:
+            if clicked_district != st.session_state["selected_district"]:
+                st.session_state["selected_district"] = clicked_district
+                st.rerun()
 
-        selected_row = trajectory_df[trajectory_df["year"] == year]
-        if not selected_row.empty:
-            fig.add_trace(go.Scatter(
-                x=selected_row["year"],
-                y=selected_row["risk_tier"],
-                mode="markers",
-                marker=dict(size=14, color="#ffffff", line=dict(color=cfg["color"], width=3)),
-                name=f"Selected ({year})",
-                hovertemplate=f"<b>Selected Year: {year}</b><br>Tier: {tier}<extra></extra>",
+with col_details:
+    st.markdown("<div class='section-label'>Selected District Details</div>", unsafe_allow_html=True)
+    
+    # Load selected district stats
+    dist_stats = map_data.get(st.session_state["selected_district"], {})
+    tier = dist_stats.get("CSI Risk Tier", 1)
+    csi_score = dist_stats.get("CSI Score", 0.0)
+    premium_adj = dist_stats.get("Recommended Premium Adjustment", "Base Rate")
+    ndvi_val = dist_stats.get("NDVI", 0.0)
+    tmax_val = dist_stats.get("Tmax", 0.0)
+    sm_val = dist_stats.get("Soil Moisture", 0.0)
+    spi3_val = dist_stats.get("SPI-3", 0.0)
+    
+    cfg = CROP_TIER_CONFIG[crop][tier]
+    
+    # 2x3 Grid of Metrics
+    mc1, mc2 = st.columns(2)
+    with mc1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Risk Tier</div>
+            <div class="metric-value" style="color:{cfg['color']};">{tier} / 5</div>
+            <div class="metric-sub">{cfg['emoji']} {cfg['label']}</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Soil Moisture</div>
+            <div class="metric-value" style="color:#7fb5ff;">{sm_val:.3f}</div>
+            <div class="metric-sub">Window Avg m³/m³</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">NDVI</div>
+            <div class="metric-value" style="color:#5cdb95;">{ndvi_val:.3f}</div>
+            <div class="metric-sub">Vegetation Index</div>
+        </div>""", unsafe_allow_html=True)
+        
+    with mc2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">CSI Score</div>
+            <div class="metric-value">{csi_score:.2f}</div>
+            <div class="metric-sub">0.0 = Min · 1.0 = Max</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">SPI-3 Index</div>
+            <div class="metric-value" style="color:#a8cc3a;">{spi3_val:.2f}</div>
+            <div class="metric-sub">Drought Metric</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:12px;'></div>", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Tmax</div>
+            <div class="metric-value" style="color:#ff6b6b;">{tmax_val:.1f}°C</div>
+            <div class="metric-sub">Window Max Temp</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+    
+    # Premium Adjust Card
+    st.markdown(f"""
+    <div class="metric-card" style="padding: 14px 20px;">
+        <div class="metric-label">Insurance Premium Signal</div>
+        <div class="metric-value" style="font-size:20px; color:#ffb703;">{premium_adj}</div>
+        <div class="metric-sub">Actuarial Risk Premium Adjustment</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+
+    # Risk Assessment Banner
+    st.markdown(f"""
+    <div class="risk-banner {cfg['css']}">
+        <div class="risk-title">{cfg['emoji']} Tier {tier} — {cfg['label']}</div>
+        <div class="risk-body">{cfg['headline']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+
+    # Field Advisory Panel
+    with st.container(border=True):
+        st.markdown(f"<div class='advisory-heading'>🌾 Recommended Actions — {crop} {year}</div>", unsafe_allow_html=True)
+        for a in cfg["actions"]:
+            st.markdown(f"<div class='advisory-item'><span>{a}</span></div>", unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+
+    # 15-Year Trajectory Panel
+    with st.container(border=True):
+        st.markdown("<div class='advisory-heading'>📈 15-Year Risk Trajectory (2026 – 2041)</div>", unsafe_allow_html=True)
+        
+        trajectory_df = fetch_trajectory_data(st.session_state["selected_district"], crop, scenario_param)
+        
+        if not trajectory_df.empty:
+            tier_colors = {1: "#3fb950", 2: "#a8cc3a", 3: "#d29922", 4: "#f85149", 5: "#ff6b6b"}
+            bar_colors  = [tier_colors.get(int(t), "#8b949e") for t in trajectory_df["risk_tier"]]
+
+            fig_traj = go.Figure()
+            fig_traj.add_trace(go.Bar(
+                x=trajectory_df["year"],
+                y=trajectory_df["risk_tier"],
+                marker_color=bar_colors,
+                marker_line_color="rgba(0,0,0,0)",
+                opacity=0.7,
+                name="Risk Tier",
+                hovertemplate="<b>%{x}</b><br>Risk Tier: %{y}<br><extra></extra>",
             ))
 
-        fig.update_layout(
-            plot_bgcolor="#161b22", paper_bgcolor="#161b22",
-            font=dict(family="Inter", color="#8b949e", size=12),
-            xaxis=dict(
-                title="Year", title_font=dict(color="#8b949e", size=11),
-                tickfont=dict(color="#8b949e"), gridcolor="#21262d",
-                tickmode="linear", dtick=2,
-            ),
-            yaxis=dict(
-                title="Risk Tier", title_font=dict(color="#8b949e", size=11),
-                tickfont=dict(color="#8b949e"), gridcolor="#21262d",
-                range=[0, 5.5], tickvals=[1, 2, 3, 4, 5],
-                ticktext=["1 — Normal", "2 — Mild", "3 — Moderate", "4 — Severe", "5 — Catastrophic"],
-            ),
-            margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", y=-0.15, x=0, font=dict(color="#8b949e")),
-            height=320,
-            bargap=0.25,
-        )
-        for t_val, t_color in tier_colors.items():
-            fig.add_hline(y=t_val, line_dash="dot", line_color=t_color, opacity=0.2, line_width=1)
+            selected_row = trajectory_df[trajectory_df["year"] == year]
+            if not selected_row.empty:
+                fig_traj.add_trace(go.Scatter(
+                    x=selected_row["year"],
+                    y=selected_row["risk_tier"],
+                    mode="markers",
+                    marker=dict(size=12, color="#ffffff", line=dict(color=cfg["color"], width=3)),
+                    name=f"Selected ({year})",
+                    hovertemplate=f"<b>Selected Year: {year}</b><br>Tier: {tier}<extra></extra>",
+                ))
 
-        st.plotly_chart(fig, width='stretch')
-    else:
-        st.info(
-            f"No trajectory data available for {crop} in {district}. "
-            "Run the CMIP6 forecasting pipeline first."
-        )
+            fig_traj.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Inter", color="#8b949e", size=11),
+                xaxis=dict(
+                    title="Year", title_font=dict(color="#8b949e", size=10),
+                    tickfont=dict(color="#8b949e"), gridcolor="rgba(255,255,255,0.06)",
+                    tickmode="linear", dtick=3,
+                ),
+                yaxis=dict(
+                    title="Risk Tier", title_font=dict(color="#8b949e", size=10),
+                    tickfont=dict(color="#8b949e"), gridcolor="rgba(255,255,255,0.06)",
+                    range=[0, 5.5], tickvals=[1, 2, 3, 4, 5],
+                    ticktext=["1", "2", "3", "4", "5"],
+                ),
+                margin=dict(l=10, r=10, t=10, b=10),
+                showlegend=False,
+                height=200,
+                bargap=0.25,
+            )
+            for t_val, t_color in tier_colors.items():
+                fig_traj.add_hline(y=t_val, line_dash="dot", line_color=t_color, opacity=0.15, line_width=1)
+
+            st.plotly_chart(fig_traj, use_container_width=True)
+        else:
+            st.info("No trajectory data available.")
 
 # ── Footer ──────────────────────────────────────────────────────────────────────
 st.markdown("""
-<div style='margin-top:40px;padding:16px 0;border-top:1px solid #21262d;
+<div style='margin-top:40px;padding:16px 0;border-top:1px solid rgba(255, 255, 255, 0.08);
      display:flex;justify-content:space-between;align-items:center;'>
-    <div style='font-size:11px;color:#484f58;'>
+    <div style='font-size:11px;color:#8b949e;'>
         CSI-DiCRA Actuarial Climate Risk Engine &nbsp;·&nbsp; Data: DiCRA · CHIRPS · PMFBY · CMIP6
     </div>
-    <div style='font-size:11px;color:#484f58;'>
+    <div style='font-size:11px;color:#8b949e;'>
         NABARD &nbsp;·&nbsp; UNDP &nbsp;·&nbsp; CSI-DiCRA-Project-V2
     </div>
 </div>

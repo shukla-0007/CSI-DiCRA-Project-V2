@@ -149,6 +149,155 @@ def get_risk_trajectory(
     ]
 
 
+@app.get("/api/v1/dashboard/map_data")
+def get_map_data(
+    crop: str = "Soybean",
+    year: int = 2026,
+    scenario: str = "SSP5_8.5",
+    db: Session = Depends(get_db)
+):
+    """
+    Returns bulk climate and risk metrics for all 52 districts under the
+    selected crop, year, and climate scenario. Useful for mapping.
+    """
+    import pandas as pd
+    import numpy as np
+    import scipy.stats as stats
+    from src.database.db import DailyClimate
+    from src.features.phenology_clipper import CROP_CALENDARS
+    from src.pipeline.dicra_fetcher import MP_DISTRICTS
+
+    if crop not in SUPPORTED_CROPS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Crop '{crop}' not supported. Choose from: {SUPPORTED_CROPS}",
+        )
+    scenario = _normalise_scenario(scenario)
+
+    # 1. Pre-fetch predictions for the year/scenario/crop in one query
+    preds = db.query(RiskPredictions).filter(
+        RiskPredictions.year == year,
+        RiskPredictions.crop == crop,
+        RiskPredictions.scenario == scenario
+    ).all()
+    pred_map = {p.district: p for p in preds}
+
+    # 2. Pre-fetch baselines
+    baselines = db.query(DistrictBaselines).filter(
+        DistrictBaselines.crop == crop
+    ).all()
+    baseline_map = {b.district: b for b in baselines}
+
+    cal = CROP_CALENDARS[crop]
+    start_year = year + cal["start_year_offset"]
+    window_start = pd.Timestamp(f"{start_year}-{cal['critical_start']}")
+    window_end   = pd.Timestamp(f"{year}-{cal['critical_end']}")
+
+    results = {}
+    for district in MP_DISTRICTS:
+        district_slug = district.replace(" ", "_").replace("-", "_").lower()
+        cache_path = os.path.join("data", "processed", f"cmip6_{district_slug}_{scenario}.csv")
+
+        if not os.path.exists(cache_path):
+            continue
+
+        try:
+            # Read cached daily climate forecast
+            df = pd.read_csv(cache_path)
+            df["date"] = pd.to_datetime(df["date"])
+
+            # Slice to critical phenological window
+            window_df = df[(df["date"] >= window_start) & (df["date"] <= window_end)]
+            if window_df.empty:
+                continue
+
+            mean_tmax = window_df["tmax"].mean()
+            mean_sm = window_df["soil_moisture"].mean()
+            mean_precip = window_df["precipitation"].mean()
+
+            # Approximate NDVI using standard formulas
+            if cal["season"] == "Kharif":
+                ndvi_approx = float(np.clip(0.30 + 0.004 * mean_precip, 0.20, 0.80))
+            else:
+                ndvi_approx = float(np.clip(0.40 + 0.002 * mean_precip, 0.30, 0.70))
+
+            # Fetch historical observed precipitation from DB for combined SPI-3
+            hist_records = db.query(DailyClimate.date, DailyClimate.precipitation).filter(
+                DailyClimate.district == district
+            ).order_by(DailyClimate.date).all()
+
+            if hist_records:
+                hist_df = pd.DataFrame(hist_records, columns=["date", "precipitation"])
+                hist_df["date"] = pd.to_datetime(hist_df["date"])
+                combined_df = pd.concat([hist_df, df[["date", "precipitation"]]], ignore_index=True)
+                combined_df = combined_df.drop_duplicates(subset=["date"]).sort_values("date").set_index("date")
+            else:
+                combined_df = df[["date", "precipitation"]].copy().set_index("date")
+
+            # Compute SPI-3 on the combined series
+            combined_df["precip_90"] = combined_df["precipitation"].rolling(window=90, min_periods=1).sum()
+            spi3_series = pd.Series(index=combined_df.index, dtype=float)
+
+            for month in range(1, 13):
+                month_mask = combined_df.index.month == month
+                month_data = combined_df.loc[month_mask, "precip_90"]
+                if month_data.empty:
+                    continue
+
+                N = len(month_data)
+                zeros_mask = month_data <= 0.001
+                m = zeros_mask.sum()
+                q = m / N
+
+                non_zero_data = month_data[~zeros_mask]
+
+                if len(non_zero_data) >= 3:
+                    try:
+                        shape, loc, scale = stats.gamma.fit(non_zero_data, floc=0)
+                        g_cdf = stats.gamma.cdf(month_data, shape, loc=loc, scale=scale)
+                        h = q + (1 - q) * g_cdf
+                    except Exception:
+                        h = month_data.rank(method='average') / (N + 1)
+                else:
+                    h = np.zeros(N)
+                    h[zeros_mask] = q
+                    if N - m > 0:
+                        h[~zeros_mask] = 0.5 + 0.5 * (month_data[~zeros_mask].rank() / (N - m + 1))
+
+                h = np.clip(h, 0.00001, 0.99999)
+                month_spi = stats.norm.ppf(h)
+                spi3_series.loc[month_mask] = month_spi
+
+            window_spi3 = spi3_series.loc[window_start:window_end].mean()
+
+            # Retrieve predicted risk tier & score
+            pred = pred_map.get(district)
+            tier = pred.risk_tier if pred else 1
+            score = pred.csi_score if pred else 0.0
+            recommended_premium = (
+                f"+{(tier - 3) * 1.5}%"
+                if tier > 3
+                else "Base Rate"
+            )
+
+            # Round output variables
+            results[district] = {
+                "NDVI": round(float(ndvi_approx), 3),
+                "Tmax": round(float(mean_tmax), 1),
+                "Soil Moisture": round(float(mean_sm), 3),
+                "SPI-3": round(float(window_spi3), 3) if pd.notna(window_spi3) else 0.0,
+                "CSI Risk Tier": int(tier),
+                "CSI Score": round(float(score), 3),
+                "Recommended Premium Adjustment": recommended_premium
+            }
+        except Exception as e:
+            # Log error and skip district
+            print(f"⚠️ Failed to extract map data for {district}: {e}")
+            continue
+
+    return results
+
+
 @app.get("/api/v1/baselines")
 def get_baselines(
     crop: str | None = None,
