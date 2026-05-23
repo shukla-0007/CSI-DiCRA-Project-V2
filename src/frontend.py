@@ -8,7 +8,7 @@ import copy
 import os
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-API_URL = "http://localhost:8000/api/v1"
+API_URL = "http://127.0.0.1:8000/api/v1"
 
 def load_api_key() -> str:
     """Load the API key from environment variable or fall back to reading from .csi_api_key."""
@@ -29,6 +29,21 @@ def load_api_key() -> str:
 
 CSI_API_KEY = load_api_key()
 HEADERS = {"X-API-KEY": CSI_API_KEY} if CSI_API_KEY else {}
+
+def wait_for_backend(timeout_seconds: int = 30) -> bool:
+    """Wait for the FastAPI backend to become responsive."""
+    import time
+    start_time = time.time()
+    while time.time() - start_time < timeout_seconds:
+        try:
+            resp = requests.get(f"{API_URL}/crops", headers=HEADERS, timeout=2)
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return False
+
 
 st.set_page_config(
     page_title="CSI-DiCRA | Farmer Advisory",
@@ -1378,12 +1393,18 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Fetch bulk map data
+if not wait_for_backend(timeout_seconds=30):
+    st.error(t["api_error"])
+    st.code("cd CSI-DiCRA-Project && PYTHONPATH=. python -m uvicorn src.main:app --reload --port 8000")
+    st.stop()
+
 map_data = fetch_bulk_map_data(crop, year, scenario_param)
 
 if not map_data:
     st.error(t["api_error"])
     st.code("cd CSI-DiCRA-Project && PYTHONPATH=. python -m uvicorn src.main:app --reload --port 8000")
     st.stop()
+
 
 # ── Layout ──────────────────────────────────────────────────────────────────────
 # Define the tabs below the CSI header

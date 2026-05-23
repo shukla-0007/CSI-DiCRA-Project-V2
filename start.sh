@@ -5,7 +5,8 @@ echo "🚀 Starting FastAPI backend on port 8000..."
 PYTHONPATH=. python -m uvicorn src.main:app --host 127.0.0.1 --port 8000 &
 
 # Wait for backend to spin up
-sleep 3
+sleep 6
+
 
 # Start Streamlit frontend on port specified by PORT env var (defaults to 7860 for Hugging Face)
 PORT=${PORT:-7860}
