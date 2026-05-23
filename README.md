@@ -1,3 +1,12 @@
+---
+title: CSI DiCRA Dashboard
+emoji: 🌾
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # 🌾 CSI-DiCRA: Compound Stress Index for Climate Resilient Agriculture
 
 A production-ready spatiotemporal machine-learning pipeline and parametric crop insurance advisory system for the 52 districts of Madhya Pradesh, India.
