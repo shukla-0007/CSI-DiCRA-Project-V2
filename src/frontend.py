@@ -1143,8 +1143,10 @@ with tab_details:
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             xaxis=dict(
-                title="Yield Deviation Contribution (kg/ha)",
-                titlefont=dict(color="#8b949e", size=10),
+                title=dict(
+                    text="Yield Deviation Contribution (kg/ha)",
+                    font=dict(color="#8b949e", size=10)
+                ),
                 tickfont=dict(color="#8b949e", size=9),
                 gridcolor="rgba(255,255,255,0.08)",
                 zerolinecolor="rgba(255,255,255,0.2)"
