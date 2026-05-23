@@ -76,6 +76,40 @@ CROP_YIELD_THRESHOLDS = {
 #  UTILITIES
 # ══════════════════════════════════════════════════════════════════════════════
 
+def get_physiological_stress_multiplier(mean_tmax: float, mean_sm: float, crop: str) -> float:
+    """
+    Applies biophysical thermal and water stress constraints based on FAO-aligned crop thresholds.
+    Returns a compound multiplier between 0.1 (extreme stress) and 1.0 (no stress).
+    """
+    # 1. Thermal Stress
+    thresholds = {
+        "Soybean": (35.0, 45.0),
+        "Rice":    (36.0, 45.0),
+        "Maize":   (38.0, 46.0),
+        "Wheat":   (30.0, 38.0),
+        "Gram":    (32.0, 40.0),
+        "Mustard": (30.0, 38.0)
+    }
+    
+    t_mult = 1.0
+    if crop in thresholds:
+        opt_t, fail_t = thresholds[crop]
+        if mean_tmax > opt_t:
+            penalty = (mean_tmax - opt_t) / (fail_t - opt_t)
+            t_mult = max(0.1, 1.0 - penalty)
+            
+    # 2. Soil Moisture Stress (Agricultural Drought)
+    # Central India crop yields collapse under water stress (optimal > 0.25, wilting < 0.12)
+    sm_mult = 1.0
+    opt_sm = 0.25
+    wilt_sm = 0.12
+    if mean_sm < opt_sm:
+        sm_penalty = (opt_sm - mean_sm) / (opt_sm - wilt_sm)
+        sm_mult = max(0.15, 1.0 - 0.85 * sm_penalty)
+        
+    return float(t_mult * sm_mult)
+
+
 def yield_to_tier(predicted_yield: float, crop: str) -> int:
     """Map a predicted yield (kg/ha) to a 1–5 Risk Tier."""
     t = CROP_YIELD_THRESHOLDS[crop]
@@ -429,7 +463,13 @@ def generate_forecasts():
                     ]])
 
                     predicted_yield = float(xgb_model.predict(features)[0])
-                    tier            = yield_to_tier(predicted_yield, crop)
+                    stress_mult     = get_physiological_stress_multiplier(
+                        features_dict["mean_tmax"], 
+                        features_dict["mean_sm"], 
+                        crop
+                    )
+                    final_yield     = predicted_yield * stress_mult
+                    tier            = yield_to_tier(final_yield, crop)
                     csi_score       = round(tier / 5.0, 3)
 
                     db.add(RiskPredictions(
