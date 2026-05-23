@@ -407,7 +407,10 @@ def start_scheduler():
 
 @app.on_event("startup")
 def startup_event():
+    from src.database.db import init_db
+    init_db()
     start_scheduler()
+
 
 
 @app.post("/api/v1/pipeline/sync")

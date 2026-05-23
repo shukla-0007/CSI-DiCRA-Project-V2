@@ -4,7 +4,8 @@ FROM python:3.11-slim
 
 # Create a system group and user (matching UID 1000 for Hugging Face compatibility)
 RUN groupadd -g 1000 appgroup && \
-    useradd -r -u 1000 -g appgroup appuser
+    useradd -m -u 1000 -g appgroup appuser
+
 
 # 2. Set the working directory inside the container
 WORKDIR /app
