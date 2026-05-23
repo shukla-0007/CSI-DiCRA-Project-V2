@@ -1,5 +1,6 @@
 # 1. Use the official lightweight Python image
-FROM python:3.10-slim
+FROM python:3.11-slim
+
 
 # Create a system group and user (matching UID 1000 for Hugging Face compatibility)
 RUN groupadd -g 1000 appgroup && \
