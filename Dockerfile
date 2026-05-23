@@ -14,11 +14,12 @@ RUN chown appuser:appgroup /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copy the application code, data, models, and the database with proper ownership
+# 4. Copy the application code, data, models, the database, and startup script with proper ownership
 COPY --chown=appuser:appgroup src/ /app/src/
 COPY --chown=appuser:appgroup data/ /app/data/
 COPY --chown=appuser:appgroup models/ /app/models/
 COPY --chown=appuser:appgroup dicra_csi.db /app/dicra_csi.db
+COPY --chown=appuser:appgroup start.sh /app/start.sh
 
 # Switch to non-root user
 USER appuser
@@ -27,5 +28,5 @@ USER appuser
 EXPOSE 8000
 EXPOSE 8501
 
-# 6. Command to run the FastAPI application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 6. Command to run the entrypoint script starting both services
+CMD ["/app/start.sh"]
