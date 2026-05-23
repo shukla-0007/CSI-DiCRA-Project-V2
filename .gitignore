@@ -6,6 +6,9 @@ models/*.pkl
 .vscode/
 CSI-DiCRA.code-workspace
 data/processed/
+data/raw/
+data/temp_shp/
+*.zip
 .csi_api_key
 .env
 
