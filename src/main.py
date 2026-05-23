@@ -193,6 +193,14 @@ def get_map_data(
     window_start = pd.Timestamp(f"{start_year}-{cal['critical_start']}")
     window_end   = pd.Timestamp(f"{year}-{cal['critical_end']}")
 
+    # Fetch historical observed precipitation for all districts at once to optimize DB roundtrips
+    all_hist = db.query(DailyClimate.district, DailyClimate.date, DailyClimate.precipitation).order_by(DailyClimate.date).all()
+    hist_by_district = {}
+    for d, dt, p in all_hist:
+        if d not in hist_by_district:
+            hist_by_district[d] = []
+        hist_by_district[d].append((dt, p))
+
     results = {}
     for district in MP_DISTRICTS:
         district_slug = district.replace(" ", "_").replace("-", "_").lower()
@@ -221,10 +229,8 @@ def get_map_data(
             else:
                 ndvi_approx = float(np.clip(0.40 + 0.002 * mean_precip, 0.30, 0.70))
 
-            # Fetch historical observed precipitation from DB for combined SPI-3
-            hist_records = db.query(DailyClimate.date, DailyClimate.precipitation).filter(
-                DailyClimate.district == district
-            ).order_by(DailyClimate.date).all()
+            # Fetch historical observed precipitation from batch dictionary for combined SPI-3
+            hist_records = hist_by_district.get(district, [])
 
             if hist_records:
                 hist_df = pd.DataFrame(hist_records, columns=["date", "precipitation"])

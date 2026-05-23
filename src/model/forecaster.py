@@ -386,11 +386,7 @@ def generate_forecasts():
     """
     db = SessionLocal()
 
-    # 1. Truncate the risk_predictions table to prevent duplicate/stale records
-    print("🗑️ Clearing all existing risk predictions...")
-    db.query(RiskPredictions).delete()
-    db.commit()
-
+    new_predictions = []
     years = list(range(FORECAST_START_YEAR, FORECAST_END_YEAR + 1))
 
     print(f"\n🔮 Generating CMIP6 forecasts ({FORECAST_START_YEAR}–{FORECAST_END_YEAR})")
@@ -472,7 +468,7 @@ def generate_forecasts():
                     tier            = yield_to_tier(final_yield, crop)
                     csi_score       = round(tier / 5.0, 3)
 
-                    db.add(RiskPredictions(
+                    new_predictions.append(RiskPredictions(
                         district  = district,
                         year      = year,
                         scenario  = scenario,
@@ -482,13 +478,23 @@ def generate_forecasts():
                     ))
                     saved += 1
 
-                # Commit per district to avoid one giant transaction
-                db.commit()
-
                 # Polite rate limit — Open-Meteo is free, don't hammer it
                 time.sleep(0.2)
 
-            print(f"  ✅ [{crop} / {scenario}] {saved} risk predictions saved.")
+            print(f"  ✅ [{crop} / {scenario}] {saved} risk predictions generated.")
+
+    # Save new predictions atomically in a single transaction
+    if new_predictions:
+        print(f"\n💾 Saving {len(new_predictions):,} new predictions atomically to database...")
+        try:
+            db.query(RiskPredictions).delete()
+            db.add_all(new_predictions)
+            db.commit()
+            print("✅ Atomic transaction completed successfully.")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Failed to commit new predictions: {e}")
+            raise e
 
     db.close()
     print(f"\n✅ All CMIP6 forecasts generated for {FORECAST_START_YEAR}–{FORECAST_END_YEAR}.")

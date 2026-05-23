@@ -1,9 +1,9 @@
 # 1. Use the official lightweight Python image
 FROM python:3.10-slim
 
-# Create a system group and user
-RUN groupadd -g 999 appgroup && \
-    useradd -r -u 999 -g appgroup appuser
+# Create a system group and user (matching UID 1000 for Hugging Face compatibility)
+RUN groupadd -g 1000 appgroup && \
+    useradd -r -u 1000 -g appgroup appuser
 
 # 2. Set the working directory inside the container
 WORKDIR /app
@@ -24,9 +24,10 @@ COPY --chown=appuser:appgroup start.sh /app/start.sh
 # Switch to non-root user
 USER appuser
 
-# 5. Expose the ports for FastAPI (8000) and Streamlit (8501)
+# 5. Expose the ports for FastAPI (8000) and Streamlit (8501 / 7860)
 EXPOSE 8000
 EXPOSE 8501
+EXPOSE 7860
 
 # 6. Command to run the entrypoint script starting both services
 CMD ["/app/start.sh"]
