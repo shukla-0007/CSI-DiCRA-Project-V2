@@ -1,13 +1,12 @@
-*.db
 __pycache__/
 *.pyc
 .DS_Store
 .vscode/
 CSI-DiCRA.code-workspace
-data/processed/
 data/raw/
 data/temp_shp/
 *.zip
 .csi_api_key
 .env
+
 

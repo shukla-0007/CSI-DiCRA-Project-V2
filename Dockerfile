@@ -20,7 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=appuser:appgroup src/ /app/src/
 COPY --chown=appuser:appgroup data/ /app/data/
 COPY --chown=appuser:appgroup models/ /app/models/
+COPY --chown=appuser:appgroup dicra_csi.db /app/dicra_csi.db
 COPY --chown=appuser:appgroup start.sh /app/start.sh
+
 
 # Switch to non-root user
 USER appuser
