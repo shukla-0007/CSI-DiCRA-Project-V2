@@ -178,7 +178,7 @@ TRANSLATIONS = {
         "traj_selected_hover": "Selected Year: {year}",
         "traj_tier_hover": "Tier: {tier}",
         "footer_text1": "CSI-DiCRA Actuarial Climate Risk Engine  ·  Data: DiCRA · CHIRPS · PMFBY · CMIP6",
-        "footer_text2": "NABARD  ·  UNDP  ·  CSI-DiCRA-Project-V2",
+        "footer_text2": "NABARD  ·  UNDP  ·  CSI-DiCRA-Project-V1",
         "no_trajectory": "No trajectory data available.",
         "api_error": "⚠️ Cannot connect to the FastAPI backend or load map data. Ensure it is running on port 8000.",
         "actions_title": "🌾 Recommended Actions — {crop} {year}",
@@ -259,7 +259,7 @@ TRANSLATIONS = {
         "traj_selected_hover": "चयनित वर्ष: {year}",
         "traj_tier_hover": "श्रेणी: {tier}",
         "footer_text1": "सीएसआई-डीकरा एक्चुरियल जलवायु जोखिम इंजन  ·  डेटा: डीकरा · चिरप्स · पीएमएफबीवाई · सीएमआईपी6",
-        "footer_text2": "नाबार्ड  ·  यूएनडीपी  ·  सीएसआई-डीकरा-प्रोजेक्ट-वी2",
+        "footer_text2": "नाबार्ड  ·  यूएनडीपी  ·  सीएसआई-डीकरा-प्रोजेक्ट-वी1",
         "no_trajectory": "कोई प्रक्षेपवक्र डेटा उपलब्ध नहीं है।",
         "api_error": "⚠️ FastAPI बैकएंड से कनेक्ट या मानचित्र डेटा लोड नहीं किया जा सका। सुनिश्चित करें कि यह पोर्ट 8000 पर चल रहा है।",
         "actions_title": "🌾 अनुशंसित कार्रवाई — {crop} {year}",
@@ -2040,8 +2040,54 @@ with tab_trajectory:
                 fig_traj.add_hline(y=t_val, line_dash="dot", line_color=t_color, opacity=0.15, line_width=1)
 
             st.plotly_chart(fig_traj, use_container_width=True)
+
+            # ── Risk Tier Colour Legend ──────────────────────────────────────────
+            TIER_LEGEND = [
+                ("#3fb950", "1", {"en": "Very Low Risk",  "hi": "अत्यंत कम जोखिम"}),
+                ("#a8cc3a", "2", {"en": "Low Risk",       "hi": "कम जोखिम"}),
+                ("#d29922", "3", {"en": "Moderate Risk",  "hi": "मध्यम जोखिम"}),
+                ("#f85149", "4", {"en": "High Risk",      "hi": "उच्च जोखिम"}),
+                ("#ff6b6b", "5", {"en": "Very High Risk", "hi": "अत्यंत उच्च जोखिम"}),
+            ]
+            legend_items = "".join([
+                f"""
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:14px;height:14px;border-radius:3px;background:{color};flex-shrink:0;"></div>
+                    <span style="font-size:11px;color:#8b949e;">
+                        <b style="color:#c9d1d9;">Tier {num}</b> — {label[lang]}
+                    </span>
+                </div>
+                """ for color, num, label in TIER_LEGEND
+            ])
+            st.markdown(f"""
+            <div style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 14px 28px;
+                padding: 10px 4px 4px 4px;
+            ">
+                {legend_items}
+            </div>
+            """, unsafe_allow_html=True)
+
         else:
             st.info(t["no_trajectory"])
+
+    # ── Disclaimer (Trajectory tab) ───────────────────────────────────────
+    st.markdown(f"""
+    <div style="
+        margin-top: 18px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border-left: 3px solid rgba(210,153,34,0.6);
+        background: rgba(210,153,34,0.06);
+        font-size: 11px;
+        color: #8b949e;
+        line-height: 1.65;
+    ">
+        {t['disclaimer']}
+    </div>
+    """, unsafe_allow_html=True)
 
 # ── Footer ──────────────────────────────────────────────────────────────────────
 st.markdown(f"""
