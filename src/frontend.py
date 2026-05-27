@@ -1612,7 +1612,6 @@ with tab_map:
             f"🌡️ {t['metric_tmax']}: <b>%{{customdata[1]:.1f}}°C</b><br>"
             f"💧 {t['metric_sm']}: <b>%{{customdata[2]:.3f}}</b><br>"
             f"🌧️ {t['metric_spi3']}: <b>%{{customdata[3]:.3f}}</b><br>"
-            f"💼 {t['insurance_signal']}: <b>%{{customdata[6]}}</b><br>"
             "<extra></extra>"
         ),
 
@@ -1775,16 +1774,7 @@ with tab_details:
             <div class="metric-sub">{t['metric_tmax_sub']}</div>
         </div>""", unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
-    
-    # Premium Adjust Card
-    st.markdown(f"""
-    <div class="metric-card" style="padding: 14px 20px;">
-        <div class="metric-label">{t['insurance_signal']}</div>
-        <div class="metric-value" style="font-size:20px; color:#ffb703;">{premium_adj_translated}</div>
-        <div class="metric-sub">{t['actuarial_premium']}</div>
-    </div>
-    """, unsafe_allow_html=True)
+
 
     # ── SHAP Explainability Plot ──────────────────────────────────────────────────
     explainability = dist_stats.get("explainability", {})
