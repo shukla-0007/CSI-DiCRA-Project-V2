@@ -1271,8 +1271,9 @@ lang = st.session_state["lang"]
 t = TRANSLATIONS[lang]
 
 # Sync temporary filters from applied/session state if not set
-if "temp_district_select" not in st.session_state:
-    st.session_state["temp_district_select"] = st.session_state["selected_district"]
+if f"temp_district_select_{lang}" not in st.session_state:
+    st.session_state[f"temp_district_select_{lang}"] = st.session_state["selected_district"]
+
 if "temp_crop_select" not in st.session_state:
     st.session_state["temp_crop_select"] = st.session_state["applied_crop"]
 if "temp_year_slider" not in st.session_state:
@@ -1370,13 +1371,16 @@ with st.sidebar:
         "Ujjain", "Umaria", "Vidisha"
     ]
     
+    default_dist_index = mp_districts.index(st.session_state.get("selected_district", "Bhopal"))
     st.selectbox(
         t['district_lbl'], 
         mp_districts, 
+        index=default_dist_index,
         format_func=lambda x: DISTRICT_TRANSLATIONS.get(x, x) if lang == "hi" else x,
         label_visibility="collapsed",
-        key="temp_district_select"
+        key=f"temp_district_select_{lang}"
     )
+
 
 
     st.markdown(f"<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['crop_lbl']}</div>", unsafe_allow_html=True)
@@ -1414,7 +1418,7 @@ with st.sidebar:
     st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
     search_clicked = st.button(t["search_btn"], use_container_width=True, type="primary")
     if search_clicked:
-        st.session_state["selected_district"] = st.session_state["temp_district_select"]
+        st.session_state["selected_district"] = st.session_state[f"temp_district_select_{lang}"]
         st.session_state["applied_crop"] = st.session_state["temp_crop_select"]
         st.session_state["applied_year"] = st.session_state["temp_year_slider"]
         st.session_state["applied_scenario"] = st.session_state["temp_scenario_radio_widget"]
@@ -1645,7 +1649,7 @@ with tab_map:
         
     fig.update_layout(
         map=dict(
-            style="carto-darkmatter",
+            style="carto-darkmatter-nolabels",
             center=dict(lat=23.3, lon=78.2),
             zoom=5.3,
             uirevision=True
@@ -1670,7 +1674,7 @@ with tab_map:
         if clicked_district and clicked_district in mp_districts:
             if clicked_district != st.session_state["selected_district"]:
                 st.session_state["selected_district"] = clicked_district
-                st.session_state["temp_district_select"] = clicked_district
+                st.session_state[f"temp_district_select_{lang}"] = clicked_district
                 st.rerun()
 
 with tab_details:
