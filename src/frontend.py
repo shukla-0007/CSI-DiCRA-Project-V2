@@ -2042,6 +2042,8 @@ with tab_trajectory:
             st.plotly_chart(fig_traj, use_container_width=True)
 
             # ── Risk Tier Colour Legend ──────────────────────────────────────────
+            # Render each tier in its own column so each st.markdown is a simple,
+            # self-contained HTML snippet — avoids Streamlit's interpolated-HTML bug.
             TIER_LEGEND = [
                 ("#3fb950", "1", {"en": "Very Low Risk",  "hi": "अत्यंत कम जोखिम"}),
                 ("#a8cc3a", "2", {"en": "Low Risk",       "hi": "कम जोखिम"}),
@@ -2049,26 +2051,18 @@ with tab_trajectory:
                 ("#f85149", "4", {"en": "High Risk",      "hi": "उच्च जोखिम"}),
                 ("#ff6b6b", "5", {"en": "Very High Risk", "hi": "अत्यंत उच्च जोखिम"}),
             ]
-            legend_items = "".join([
-                f"""
-                <div style="display:flex;align-items:center;gap:6px;">
-                    <div style="width:14px;height:14px;border-radius:3px;background:{color};flex-shrink:0;"></div>
-                    <span style="font-size:11px;color:#8b949e;">
-                        <b style="color:#c9d1d9;">Tier {num}</b> — {label[lang]}
-                    </span>
-                </div>
-                """ for color, num, label in TIER_LEGEND
-            ])
-            st.markdown(f"""
-            <div style="
-                display: flex;
-                flex-wrap: wrap;
-                gap: 14px 28px;
-                padding: 10px 4px 4px 4px;
-            ">
-                {legend_items}
-            </div>
-            """, unsafe_allow_html=True)
+            leg_cols = st.columns(5)
+            for i, (color, num, label) in enumerate(TIER_LEGEND):
+                with leg_cols[i]:
+                    st.markdown(
+                        f'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;">'
+                        f'<div style="width:13px;height:13px;border-radius:3px;'
+                        f'background:{color};flex-shrink:0;"></div>'
+                        f'<span style="font-size:11px;color:#8b949e;">'
+                        f'<b style="color:#c9d1d9;">Tier {num}</b><br>{label[lang]}'
+                        f'</span></div>',
+                        unsafe_allow_html=True,
+                    )
 
         else:
             st.info(t["no_trajectory"])
