@@ -52,8 +52,65 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ── District Translation Mapping ────────────────────────────────────────────────
+DISTRICT_TRANSLATIONS = {
+    "Agar Malwa": "आगर मालवा",
+    "Alirajpur": "अलीराजपुर",
+    "Anuppur": "अनूपपुर",
+    "Ashoknagar": "अशोकनगर",
+    "Balaghat": "बालाघाट",
+    "Barwani": "बड़वानी",
+    "Betul": "बैतूल",
+    "Bhind": "भिंड",
+    "Bhopal": "भोपाल",
+    "Burhanpur": "बुरहानपुर",
+    "Chhatarpur": "छतरपुर",
+    "Chhindwara": "छिंदवाड़ा",
+    "Damoh": "दमोह",
+    "Datia": "दतिया",
+    "Dewas": "देवास",
+    "Dhar": "धार",
+    "Dindori": "डिंडोरी",
+    "Guna": "गुना",
+    "Gwalior": "ग्वालियर",
+    "Harda": "हरदा",
+    "Hoshangabad": "होशंगाबाद",
+    "Indore": "इंदौर",
+    "Jabalpur": "जबलपुर",
+    "Jhabua": "झाबुआ",
+    "Katni": "कटनी",
+    "Khandwa": "खंडवा",
+    "Khargone": "खरगोन",
+    "Mandla": "मंडला",
+    "Mandsaur": "मंदसौर",
+    "Morena": "मुरैना",
+    "Narsinghpur": "नरसिंहपुर",
+    "Neemuch": "नीमच",
+    "Niwari": "निवाड़ी",
+    "Panna": "पन्ना",
+    "Raisen": "रायसेन",
+    "Rajgarh": "राजगढ़",
+    "Ratlam": "रतलाम",
+    "Rewa": "रीवा",
+    "Sagar": "सागर",
+    "Satna": "सतना",
+    "Sehore": "सीहोर",
+    "Seoni": "सिवनी",
+    "Shahdol": "शहडोल",
+    "Shajapur": "शाजापुर",
+    "Sheopur": "श्योपुर",
+    "Shivpuri": "शिवपुरी",
+    "Sidhi": "सीधी",
+    "Singrauli": "सिंगरौली",
+    "Tikamgarh": "टीकमगढ़",
+    "Ujjain": "उज्जैन",
+    "Umaria": "उमरिया",
+    "Vidisha": "विदिशा"
+}
+
 # ── Translation Dictionary ──────────────────────────────────────────────────────
 TRANSLATIONS = {
+
     "en": {
         "title": "Compound Stress Index",
         "sub_header": "Data in Climate Resilient Agriculture",
@@ -1316,9 +1373,11 @@ with st.sidebar:
     st.selectbox(
         t['district_lbl'], 
         mp_districts, 
+        format_func=lambda x: DISTRICT_TRANSLATIONS.get(x, x) if lang == "hi" else x,
         label_visibility="collapsed",
         key="temp_district_select"
     )
+
 
     st.markdown(f"<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['crop_lbl']}</div>", unsafe_allow_html=True)
     crop_options = list(CROP_DISPLAY.keys())
@@ -1386,9 +1445,10 @@ st.markdown(f"""
     </div>
     <div class="dash-subtitle">
         {t['sub_header']} &nbsp;·&nbsp; {t['sub_badge']} &nbsp;·&nbsp;
-        {st.session_state["selected_district"]} &nbsp;·&nbsp; {crop_meta['emoji']} {t[crop]} &nbsp;·&nbsp;
+        {DISTRICT_TRANSLATIONS.get(st.session_state["selected_district"], st.session_state["selected_district"]) if lang == "hi" else st.session_state["selected_district"]} &nbsp;·&nbsp; {crop_meta['emoji']} {t[crop]} &nbsp;·&nbsp;
         {t[crop_meta['season']]} {year} &nbsp;·&nbsp; {scenario_display}
     </div>
+
 </div>
 """, unsafe_allow_html=True)
 
@@ -1508,6 +1568,11 @@ with tab_map:
     
     l_cfg = LAYER_CONFIGS[selected_layer]
     
+    # Add a column for translated district names
+    map_df["district_display"] = map_df["district"].apply(
+        lambda x: DISTRICT_TRANSLATIONS.get(x, x) if lang == "hi" else x
+    )
+
     # Stack data for custom hovers
     customdata = np.stack((
         map_df["NDVI"],
@@ -1516,7 +1581,8 @@ with tab_map:
         map_df["SPI-3"],
         map_df["CSI Risk Tier"],
         map_df["CSI Score"],
-        map_df["Recommended Premium Adjustment Translated"]
+        map_df["Recommended Premium Adjustment Translated"],
+        map_df["district_display"]
     ), axis=-1)
     
     fig = go.Figure()
@@ -1535,7 +1601,7 @@ with tab_map:
         marker_line_color="rgba(255,255,255,0.15)",
         customdata=customdata,
         hovertemplate=(
-            f"<b>{t['district_lbl']}: %{{location}}</b><br><br>"
+            f"<b>{t['district_lbl']}: %{{customdata[7]}}</b><br><br>"
             f"🔴 {t['metric_risk_tier']}: <b>%{{customdata[4]}} / 5</b><br>"
             f"📊 {t['metric_csi_score']}: <b>%{{customdata[5]:.2f}}</b><br>"
             f"🌱 {t['metric_ndvi']}: <b>%{{customdata[0]:.3f}}</b><br>"
@@ -1545,6 +1611,7 @@ with tab_map:
             f"💼 {t['insurance_signal']}: <b>%{{customdata[6]}}</b><br>"
             "<extra></extra>"
         ),
+
         colorbar=dict(
             title=dict(text=l_cfg["colorbar_title"], font=dict(color="#8b949e", size=11)),
             tickfont=dict(color="#8b949e", size=10),
