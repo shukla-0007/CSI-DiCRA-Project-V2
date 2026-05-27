@@ -150,8 +150,27 @@ TRANSLATIONS = {
         "insurance_signal": "Insurance Premium Signal",
         "actuarial_premium": "Actuarial Risk Premium Adjustment",
         "premium_base": "Base Rate",
-        "shap_title": "🔍 Actuarial Explainability: Yield Deficit/Surplus (Base: {base_value:,.0f} kg/ha)",
-        "shap_xaxis": "Yield Deviation Contribution (kg/ha)",
+        "shap_title": "🌾 What affected your crop yield this season? (Base yield: {base_value:,.0f} kg/ha)",
+        "shap_xaxis": "Effect on crop yield (kg per hectare)",
+        "shap_legend_green": "Helped the crop",
+        "shap_legend_red": "Harmed the crop",
+        "shap_glossary_heading": "📖 What do these terms mean?",
+        
+        # SHAP feature labels (bar chart)
+        "shap_feat_temp": "🌡️ Average Temperature",
+        "shap_feat_sm": "💧 Soil Water Level",
+        "shap_feat_ndvi": "🌿 Crop Greenness (NDVI)",
+        "shap_feat_precip": "☁️ Total Rainfall",
+        "shap_feat_temp_anom": "🔥 Unusual Heat",
+        "shap_feat_sm_anom": "🏜️ Unusual Dryness",
+        
+        # SHAP glossary definitions (shown below the chart)
+        "shap_def_temp":  "The average daytime temperature during the crop season. Very high temperatures stress the crop and reduce yield.",
+        "shap_def_sm":    "The amount of water stored in the soil. Crops need enough moisture in the soil to grow well.",
+        "shap_def_ndvi":  "A satellite measure of how green and healthy the crop looks. Higher greenness usually means a healthier crop.",
+        "shap_def_precip":"The total rainfall received during the season. More rain (up to a point) helps the crop produce more grain.",
+        "shap_def_temp_anom": "How much hotter it was compared to a normal year. Unusual heat can damage flowers and reduce grain filling.",
+        "shap_def_sm_anom":   "How much drier or wetter the soil was compared to a normal year. Unusual dryness stresses the crop roots.",
         "traj_title": "📈 15-Year Risk Trajectory (2026 – 2041)",
         "traj_xaxis": "Year",
         "traj_yaxis": "Risk Tier",
@@ -175,14 +194,6 @@ TRANSLATIONS = {
         # Seasons
         "Kharif": "Kharif",
         "Rabi": "Rabi",
-        
-        # SHAP Features
-        "shap_feat_temp": "Mean Temperature",
-        "shap_feat_sm": "Soil Moisture",
-        "shap_feat_ndvi": "NDVI Vegetation Index",
-        "shap_feat_precip": "Total Precipitation",
-        "shap_feat_temp_anom": "Temperature Anomaly",
-        "shap_feat_sm_anom": "Soil Moisture Anomaly",
         
         # Scenarios
         "ssp2_display": "SSP2-4.5 — Moderate Action",
@@ -227,8 +238,11 @@ TRANSLATIONS = {
         "insurance_signal": "बीमा प्रीमियम संकेत",
         "actuarial_premium": "एक्चुरियल जोखिम प्रीमियम समायोजन",
         "premium_base": "मूल दर",
-        "shap_title": "🔍 एक्चुरियल विश्लेषण: उपज घाटा/अधिशेष (आधार: {base_value:,.0f} किग्रा/हेक्टेयर)",
-        "shap_xaxis": "उपज विचलन योगदान (किग्रा/हेक्टेयर)",
+        "shap_title": "🌾 इस मौसम आपकी फसल को क्या प्रभावित किया? (आधार उपज: {base_value:,.0f} किग्रा/हेक्टेयर)",
+        "shap_xaxis": "फसल उपज पर असर (किग्रा प्रति हेक्टेयर)",
+        "shap_legend_green": "फसल को फायदा हुआ",
+        "shap_legend_red": "फसल को नुकसान हुआ",
+        "shap_glossary_heading": "📖 इन शब्दों का क्या अर्थ है?",
         "traj_title": "📈 15-वर्षीय जोखिम प्रक्षेपवक्र (2026 – 2041)",
         "traj_xaxis": "वर्ष",
         "traj_yaxis": "जोखिम श्रेणी",
@@ -253,13 +267,21 @@ TRANSLATIONS = {
         "Kharif": "खरीफ",
         "Rabi": "रबी",
         
-        # SHAP Features
-        "shap_feat_temp": "औसत तापमान (Mean Temp)",
-        "shap_feat_sm": "मिट्टी की नमी (Soil Moisture)",
-        "shap_feat_ndvi": "एनडीवीआई सूचकांक (NDVI)",
-        "shap_feat_precip": "कुल वर्षा (Precipitation)",
-        "shap_feat_temp_anom": "तापमान विसंगति (Temp Anomaly)",
-        "shap_feat_sm_anom": "मिट्टी नमी विसंगति (SM Anomaly)",
+        # SHAP feature labels (bar chart — farmer-friendly)
+        "shap_feat_temp": "🌡️ औसत तापमान",
+        "shap_feat_sm": "💧 मिट्टी में पानी का स्तर",
+        "shap_feat_ndvi": "🌿 फसल की हरियाली (NDVI)",
+        "shap_feat_precip": "☁️ कुल वर्षा",
+        "shap_feat_temp_anom": "🔥 असामान्य गर्मी",
+        "shap_feat_sm_anom": "🏜️ असामान्य सूखापन",
+        
+        # SHAP glossary definitions
+        "shap_def_temp":      "फसल के मौसम में दिन का औसत तापमान। अधिक गर्मी से फसल पर तनाव पड़ता है और उपज घटती है।",
+        "shap_def_sm":        "मिट्टी में संग्रहित पानी की मात्रा। फसल की अच्छी वृद्धि के लिए मिट्टी में पर्याप्त नमी जरूरी है।",
+        "shap_def_ndvi":      "उपग्रह से मापी गई फसल की हरियाली। अधिक हरियाली = स्वस्थ फसल।",
+        "shap_def_precip":    "मौसम में हुई कुल वर्षा। उचित मात्रा में बारिश से अनाज अधिक होता है।",
+        "shap_def_temp_anom": "सामान्य वर्ष की तुलना में कितनी अधिक गर्मी पड़ी। असामान्य गर्मी से फूल और दाने बनने पर असर पड़ता है।",
+        "shap_def_sm_anom":   "सामान्य वर्ष की तुलना में मिट्टी कितनी अधिक सूखी या गीली रही। असामान्य सूखापन फसल की जड़ों को नुकसान पहुँचाता है।",
         
         # Scenarios
         "ssp2_display": "SSP2-4.5 — मध्यम प्रयास",
@@ -1843,6 +1865,49 @@ with tab_details:
         st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
         with st.container(border=True):
             st.plotly_chart(fig_shap, use_container_width=True)
+
+            # ── Legend strip ─────────────────────────────────────────────────
+            st.markdown(f"""
+            <div style="display:flex; gap:20px; justify-content:center; margin:-8px 0 16px 0;">
+              <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e;">
+                <span style="width:14px;height:14px;border-radius:3px;background:#26a69a;display:inline-block;"></span>
+                {t['shap_legend_green']}
+              </span>
+              <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e;">
+                <span style="width:14px;height:14px;border-radius:3px;background:#ef5350;display:inline-block;"></span>
+                {t['shap_legend_red']}
+              </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # ── Glossary section ──────────────────────────────────────────────
+            st.markdown(f"<div style='font-size:13px; font-weight:600; color:#c9d1d9; margin:8px 0 12px 0;'>{t['shap_glossary_heading']}</div>", unsafe_allow_html=True)
+
+            GLOSSARY = [
+                (t["shap_feat_precip"],   t["shap_def_precip"]),
+                (t["shap_feat_temp_anom"],t["shap_def_temp_anom"]),
+                (t["shap_feat_sm"],       t["shap_def_sm"]),
+                (t["shap_feat_sm_anom"],  t["shap_def_sm_anom"]),
+                (t["shap_feat_ndvi"],     t["shap_def_ndvi"]),
+                (t["shap_feat_temp"],     t["shap_def_temp"]),
+            ]
+
+            # Render in a 2-column grid
+            cols = st.columns(2)
+            for i, (term, defn) in enumerate(GLOSSARY):
+                with cols[i % 2]:
+                    st.markdown(f"""
+                    <div style="
+                        background: rgba(255,255,255,0.04);
+                        border: 1px solid rgba(255,255,255,0.08);
+                        border-radius: 8px;
+                        padding: 10px 14px;
+                        margin-bottom: 8px;
+                    ">
+                        <div style="font-size:12px; font-weight:700; color:#e4e6eb; margin-bottom:4px;">{term}</div>
+                        <div style="font-size:11.5px; color:#8b949e; line-height:1.5;">{defn}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 
 with tab_actions:
