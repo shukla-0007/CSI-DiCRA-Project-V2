@@ -1687,36 +1687,9 @@ with tab_map:
         ))
         
     # ── State-name label overlay ─────────────────────────────────────────────────
-    # In Hindi mode we use a no-labels basemap and draw our own bilingual
-    # state-name annotations so labels appear in the correct script.
-    # In English mode the carto-darkmatter tile already carries English labels.
-    STATE_LABELS = [
-        # (lat,  lon,   English name,         Hindi name)
-        (23.50,  78.00, "Madhya Pradesh",      "मध्य प्रदेश"),
-        (26.80,  80.90, "Uttar Pradesh",       "उत्तर प्रदेश"),
-        (27.00,  74.20, "Rajasthan",           "राजस्थान"),
-        (22.30,  71.20, "Gujarat",             "गुजरात"),
-        (19.70,  75.70, "Maharashtra",         "महाराष्ट्र"),
-        (21.30,  81.90, "Chhattisgarh",        "छत्तीसगढ़"),
-        (23.60,  85.30, "Jharkhand",           "झारखंड"),
-    ]
-
-    if lang == "hi":
-        lats  = [s[0] for s in STATE_LABELS]
-        lons  = [s[1] for s in STATE_LABELS]
-        texts = [s[3] for s in STATE_LABELS]   # Hindi names
-        fig.add_trace(go.Scattermap(
-            lat=lats,
-            lon=lons,
-            mode="text",
-            text=texts,
-            textfont=dict(size=11, color="rgba(200,200,200,0.75)", family="Noto Sans Devanagari, sans-serif"),
-            hoverinfo="skip",
-            showlegend=False,
-        ))
-        map_style = "carto-darkmatter-nolabels"
-    else:
-        map_style = "carto-darkmatter"
+    # We use the standard carto-darkmatter basemap for both English and Hindi modes
+    # to preserve all built-in background state and city labels.
+    map_style = "carto-darkmatter"
 
     fig.update_layout(
         map=dict(
