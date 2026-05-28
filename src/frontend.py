@@ -332,7 +332,7 @@ st.markdown("""
         color: #ffffff; margin: 0; letter-spacing: -0.5px;
     }
     .dash-subtitle {
-        font-size: 13px; color: #82b082; margin-top: 4px; font-weight: 400;
+        font-size: 13px; color: #1e7e34; margin-top: 4px; font-weight: 400;
     }
     .badge {
         display: inline-block;
@@ -363,12 +363,12 @@ st.markdown("""
     }
     .metric-label {
         font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
-        text-transform: uppercase; color: #8b949e; margin-bottom: 6px;
+        text-transform: uppercase; color: #767676; margin-bottom: 6px;
     }
     .metric-value {
         font-size: 28px; font-weight: 700; color: #ffffff; line-height: 1.1;
     }
-    .metric-sub { font-size: 11px; color: #8b949e; margin-top: 6px; }
+    .metric-sub { font-size: 11px; color: #767676; margin-top: 6px; }
 
     /* Risk Banner with Glassmorphism */
     .risk-banner {
@@ -403,7 +403,7 @@ st.markdown("""
     }
     .advisory-heading {
         font-size: 12px; font-weight: 600; letter-spacing: 1px;
-        color: #8b949e; text-transform: uppercase; margin-bottom: 12px;
+        color: #767676; text-transform: uppercase; margin-bottom: 12px;
     }
     .advisory-item {
         font-size: 13.5px; color: #c9d1d9;
@@ -415,14 +415,14 @@ st.markdown("""
     /* Section label */
     .section-label {
         font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
-        text-transform: uppercase; color: #8b949e;
+        text-transform: uppercase; color: #767676;
         margin: 24px 0 12px;
     }
 
     /* Sidebar */
     [data-testid="stSidebar"] { background-color: #0b0d12; border-right: 1px solid rgba(255, 255, 255, 0.07); }
     [data-testid="stSidebar"] .stSelectbox label,
-    [data-testid="stSidebar"] .stSlider label { color: #8b949e !important; font-size: 12px !important; }
+    [data-testid="stSidebar"] .stSlider label { color: #767676 !important; font-size: 12px !important; }
 
     /* Style Streamlit containers with borders as glassmorphic cards */
     div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -527,7 +527,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif !important;
         font-size: 13.5px !important;
         font-weight: 600 !important;
-        color: #8b949e !important;
+        color: #767676 !important;
         background: rgba(22, 27, 34, 0.35) !important;
         border: 1px solid rgba(255, 255, 255, 0.06) !important;
         border-bottom: none !important;
@@ -1396,11 +1396,11 @@ with st.sidebar:
     st.markdown(f"""
     <div style='padding: 8px 0 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 20px;'>
         <div style='font-size:18px; font-weight:700; color:#ffffff;'>🌾 {t['title']}</div>
-        <div style='font-size:11px; color:#7aab7a; margin-top:2px;'>{t['sub_header']}</div>
+        <div style='font-size:11px; color:#1e7e34; margin-top:2px;'>{t['sub_header']}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown(f"<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;'>{t['district_lbl']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:11px;color:#767676;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;'>{t['district_lbl']}</div>", unsafe_allow_html=True)
     mp_districts = [
         "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani", "Betul", "Bhind",
         "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara", "Damoh", "Datia", "Dewas", "Dhar",
@@ -1423,7 +1423,7 @@ with st.sidebar:
 
 
 
-    st.markdown(f"<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['crop_lbl']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:11px;color:#767676;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['crop_lbl']}</div>", unsafe_allow_html=True)
     crop_options = list(CROP_DISPLAY.keys())
 
     st.selectbox(
@@ -1434,7 +1434,7 @@ with st.sidebar:
         key="temp_crop_select",
     )
 
-    st.markdown(f"<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['season_year_lbl']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:11px;color:#767676;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['season_year_lbl']}</div>", unsafe_allow_html=True)
     st.slider(
         t['season_year_lbl'], 
         min_value=2026, 
@@ -1443,7 +1443,7 @@ with st.sidebar:
         key="temp_year_slider"
     )
 
-    st.markdown(f"<div style='font-size:11px;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['scenario_lbl']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:11px;color:#767676;letter-spacing:1px;text-transform:uppercase;margin:20px 0 6px;'>{t['scenario_lbl']}</div>", unsafe_allow_html=True)
     
     # Render scenario selection with dynamic labels while maintaining static internal keys
     st.radio(
@@ -1468,7 +1468,7 @@ with st.sidebar:
 
     st.markdown(f"""
     <div style='margin-top:32px;padding:12px;background:rgba(22, 27, 34, 0.5);border:1px solid rgba(255,255,255,0.08);border-radius:8px;'>
-        <div style='font-size:11px;color:#8b949e;'>
+        <div style='font-size:11px;color:#767676;'>
             <b style='color:#c9d1d9;'>{t['data_sources']}</b><br><br>
             🛰️ {t['dicra_api']}<br>
             🌧️ {t['chirps_drought']}<br>
@@ -1656,8 +1656,8 @@ with tab_map:
         ),
 
         colorbar=dict(
-            title=dict(text=l_cfg["colorbar_title"], font=dict(color="#8b949e", size=11)),
-            tickfont=dict(color="#8b949e", size=10),
+            title=dict(text=l_cfg["colorbar_title"], font=dict(color="#767676", size=11)),
+            tickfont=dict(color="#767676", size=10),
             bgcolor="rgba(0,0,0,0)",
             thickness=12,
             len=0.6,
@@ -1839,9 +1839,9 @@ with tab_details:
             xaxis=dict(
                 title=dict(
                     text=t["shap_xaxis"],
-                    font=dict(color="#8b949e", size=10)
+                    font=dict(color="#767676", size=10)
                 ),
-                tickfont=dict(color="#8b949e", size=9),
+                tickfont=dict(color="#767676", size=9),
                 gridcolor="rgba(255,255,255,0.08)",
                 zerolinecolor="rgba(255,255,255,0.2)"
             ),
@@ -1860,11 +1860,11 @@ with tab_details:
             # ── Legend strip ─────────────────────────────────────────────────
             st.markdown(f"""
             <div style="display:flex; gap:20px; justify-content:center; margin:-8px 0 16px 0;">
-              <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e;">
+              <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#767676;">
                 <span style="width:14px;height:14px;border-radius:3px;background:#26a69a;display:inline-block;"></span>
                 {t['shap_legend_green']}
               </span>
-              <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e;">
+              <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:#767676;">
                 <span style="width:14px;height:14px;border-radius:3px;background:#ef5350;display:inline-block;"></span>
                 {t['shap_legend_red']}
               </span>
@@ -1896,7 +1896,7 @@ with tab_details:
                         margin-bottom: 8px;
                     ">
                         <div style="font-size:12px; font-weight:700; color:#e4e6eb; margin-bottom:4px;">{term}</div>
-                        <div style="font-size:11.5px; color:#8b949e; line-height:1.5;">{defn}</div>
+                        <div style="font-size:11.5px; color:#767676; line-height:1.5;">{defn}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -1909,7 +1909,7 @@ with tab_details:
         border-left: 3px solid rgba(210,153,34,0.6);
         background: rgba(210,153,34,0.06);
         font-size: 11px;
-        color: #8b949e;
+        color: #767676;
         line-height: 1.65;
     ">
         {t['disclaimer']}
@@ -1947,7 +1947,7 @@ with tab_actions:
         border-left: 3px solid rgba(210,153,34,0.6);
         background: rgba(210,153,34,0.06);
         font-size: 11px;
-        color: #8b949e;
+        color: #767676;
         line-height: 1.65;
     ">
         {t['disclaimer']}
@@ -1965,7 +1965,7 @@ with tab_trajectory:
         
         if not trajectory_df.empty:
             tier_colors = {1: "#3fb950", 2: "#a8cc3a", 3: "#d29922", 4: "#f85149", 5: "#ff6b6b"}
-            bar_colors  = [tier_colors.get(int(t_idx), "#8b949e") for t_idx in trajectory_df["risk_tier"]]
+            bar_colors  = [tier_colors.get(int(t_idx), "#767676") for t_idx in trajectory_df["risk_tier"]]
 
             fig_traj = go.Figure()
             fig_traj.add_trace(go.Bar(
@@ -1992,15 +1992,15 @@ with tab_trajectory:
 
             fig_traj.update_layout(
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Inter", color="#8b949e", size=11),
+                font=dict(family="Inter", color="#767676", size=11),
                 xaxis=dict(
-                    title=t["traj_xaxis"], title_font=dict(color="#8b949e", size=10),
-                    tickfont=dict(color="#8b949e"), gridcolor="rgba(255,255,255,0.06)",
+                    title=t["traj_xaxis"], title_font=dict(color="#767676", size=10),
+                    tickfont=dict(color="#767676"), gridcolor="rgba(255,255,255,0.06)",
                     tickmode="linear", dtick=3,
                 ),
                 yaxis=dict(
-                    title=t["traj_yaxis"], title_font=dict(color="#8b949e", size=10),
-                    tickfont=dict(color="#8b949e"), gridcolor="rgba(255,255,255,0.06)",
+                    title=t["traj_yaxis"], title_font=dict(color="#767676", size=10),
+                    tickfont=dict(color="#767676"), gridcolor="rgba(255,255,255,0.06)",
                     range=[0, 5.5], tickvals=[1, 2, 3, 4, 5],
                     ticktext=["1", "2", "3", "4", "5"],
                 ),
@@ -2031,7 +2031,7 @@ with tab_trajectory:
                         f'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;">'
                         f'<div style="width:13px;height:13px;border-radius:3px;'
                         f'background:{color};flex-shrink:0;"></div>'
-                        f'<span style="font-size:11px;color:#8b949e;">'
+                        f'<span style="font-size:11px;color:#767676;">'
                         f'<b style="color:#c9d1d9;">Tier {num}</b><br>{label[lang]}'
                         f'</span></div>',
                         unsafe_allow_html=True,
@@ -2049,7 +2049,7 @@ with tab_trajectory:
         border-left: 3px solid rgba(210,153,34,0.6);
         background: rgba(210,153,34,0.06);
         font-size: 11px;
-        color: #8b949e;
+        color: #767676;
         line-height: 1.65;
     ">
         {t['disclaimer']}
@@ -2060,10 +2060,10 @@ with tab_trajectory:
 st.markdown(f"""
 <div style='margin-top:40px;padding:16px 0;border-top:1px solid rgba(255, 255, 255, 0.08);
      display:flex;justify-content:space-between;align-items:center;'>
-    <div style='font-size:11px;color:#8b949e;'>
+    <div style='font-size:11px;color:#767676;'>
         {t['footer_text1']}
     </div>
-    <div style='font-size:11px;color:#8b949e;'>
+    <div style='font-size:11px;color:#767676;'>
         {t['footer_text2']}
     </div>
 </div>
