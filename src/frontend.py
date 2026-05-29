@@ -541,10 +541,10 @@ st.markdown("""
         border-color: rgba(255, 255, 255, 0.15) !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
-        color: #7aff7a !important;
+        color: #1e7e34 !important;
         background: rgba(45, 74, 45, 0.2) !important;
         border-color: rgba(74, 117, 74, 0.4) !important;
-        border-bottom: 2px solid #7aff7a !important;
+        border-bottom: 2px solid #1e7e34 !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 -4px 12px rgba(74, 117, 74, 0.15) !important;
     }
     /* Hide the default purple underline highlight from baseweb */
