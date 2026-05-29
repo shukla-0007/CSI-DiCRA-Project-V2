@@ -1726,22 +1726,11 @@ with tab_map:
         height=620
     )
     
-    event = st.plotly_chart(
+    st.plotly_chart(
         fig, 
-        on_select="rerun", 
-        selection_mode="points", 
         key="map_plot", 
         use_container_width=True
     )
-    
-    # Trigger state update on map click
-    if event and "selection" in event and event["selection"]["points"]:
-        clicked_district = event["selection"]["points"][0].get("location")
-        if clicked_district and clicked_district in mp_districts:
-            if clicked_district != st.session_state["selected_district"]:
-                st.session_state["selected_district"] = clicked_district
-                st.session_state[f"temp_district_select_{lang}"] = clicked_district
-                st.rerun()
 
 with tab_details:
     st.markdown(f"<div class='section-label'>{t['sec_details']}</div>", unsafe_allow_html=True)
