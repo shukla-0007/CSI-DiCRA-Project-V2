@@ -13,6 +13,10 @@ A production-ready spatiotemporal machine-learning pipeline and parametric crop 
 
 ---
 
+Live Project Link: https://huggingface.co/spaces/shukla1369/csi-dicra-dashboard?logs=container
+
+---
+
 ## 📌 Project Overview
 CSI-DiCRA addresses the **"Basis Risk"** failure in India's Pradhan Mantri Fasal Bima Yojana (PMFBY) crop insurance scheme. Traditional area-average models fail to capture localized compound heat-and-drought shocks during critical crop growth phases.
 
